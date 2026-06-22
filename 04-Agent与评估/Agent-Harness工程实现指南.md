@@ -63,6 +63,40 @@ def agentic_loop(task, tools, max_steps=50):
 - **结果回填顺序**:工具结果必须以正确的角色/格式回填,且与 `tool_use_id` 严格对齐,否则模型会错乱。
 - **循环很小,周边很大**:循环本身是已解决的问题;真正的工程难度在循环**周边**——上下文管理、安全控制、优雅降级、成本控制。
 
+### 1.4 何时重试、何时放弃、何时升级(可执行判据)
+
+循环里最常见的成本黑洞不是"模型不够聪明",而是**把不可能成功的错误一遍遍重试**。一项 200 任务的基准测量发现:ReAct 类 agent **90.8% 的重试预算被浪费**——系统反复重试根本不存在的工具(把 `TOOL_NOT_FOUND` 当成 `TRANSIENT` 同等对待),等真正的网络超时两步后到来时,预算已经耗光。
+
+**第一步:把错误分类(这是省钱的最大杠杆)。** 在工具层定义带类型的异常,按下表路由,而不是"统一重试":
+
+| 错误类别 | 典型信号 | 处理动作 | 重试次数建议 |
+|----------|----------|----------|--------------|
+| **Transient(瞬时)** | HTTP 408/5xx、连接超时、网络抖动 | 指数退避重试 | 3 次 |
+| **Throttling(限流)** | HTTP 429、`Retry-After` 头 | 单独一档,**退避更久**、尊重 `Retry-After` | 5–7 次 |
+| **LLM-recoverable(模型可自救)** | schema 校验失败、JSON 解析失败、参数错误 | **不重试**,把具体错误作为 observation 回填让模型改写 | 0(改写而非重试) |
+| **Permanent(永久)** | HTTP 400/404、工具不存在、权限拒绝 | **不重试**,直接记录 + 优雅降级 | 0 |
+| **Human-required(需人介入)** | 凭证失效、策略拒绝、关键正确性任务失败 | 暂停 + 升级给人 | 0 |
+
+> 核心原则:**在消耗重试槽之前先判类**。永久错误若与瞬时错误共用同一个重试预算,会把预算榨干。`if not exc.is_retryable(): break` 这一行,往往就能挽回绝大部分被浪费的重试。
+
+**第二步:瞬时错误用"指数退避 + 抖动(jitter)"。** 标准公式(对齐 AWS full-jitter):
+
+```
+delay = random(0, 1) × min(cap, base_delay × 2^retry)
+# base_delay≈1s,cap≈20s;jitter 防止"惊群"——多 agent 同时撞墙后同时重试
+```
+
+**第三步:何时放弃 / 切换策略(给死循环装刹车)。** 这些判据必须在代码里:
+
+- **同一操作连续失败 1–2 次** → 停止重试,换策略或总结阻塞点,而不是傻等。
+- **持续(非偶发)5xx 对同一请求** → 不再重试,转去排查(往往是请求本身的问题)。
+- **循环检测器**:对最近若干步的 `(tool_name, args_hash)` 做签名,**同签名出现 ≥3 次** → 强制模型反思或退出。这是 ReAct 规模化后最常见的死循环来源。
+- **多层预算并存**:per-call 重试之外,还要有 session 总超时、agent loop step 上限、per-tool 超时、"连续/累计错误"上限、以及成本 guardrail。
+
+**第四步:分层防御(每层兜下层漏的)。** 重试(扛 2 秒就好的 503)→ 模型 fallback 链(扛 10 分钟的 provider 宕机)→ 错误分类(扛再多重试也没用的工具错)→ checkpoint 恢复(扛进程崩溃)→ 人工升级。目标不是"零失败",而是"**零需要人去发现并修的失败**"。
+
+> 重要反面模式——**幻觉式遗漏(hallucination-by-omission)**:除非显式告诉它"`ok=false` 就停",否则 agent 会跳过失败的工具结果、编造数据来"完成"任务。错误要作为 observation 回填(`errors as data`),但同时要防它假装没看见。
+
 ### 1.4 什么时候 **不** 该用 agent loop
 
 不是所有任务都适合循环:
@@ -175,9 +209,17 @@ system prompt 通常包含:身份与规则、环境信息(cwd、git 状态、平
 
 **① 压缩(Compaction)** —— 第一道杠杆
 - 做法:对话接近窗口上限时,**总结其内容**,用摘要重新初始化一个新窗口。
-- 难点在**取舍**:压得太狠会丢掉"当时不起眼、后来才关键"的上下文。
+- **什么时候触发(具体阈值)**:业界落地的触发点不是拍脑袋,有几个参照系——
+  - **Claude Code**:在**有效窗口 98%** 处自动压缩(auto-compaction),也可用 `/compact` 手动触发。新版做成后台连续摘要,压缩近乎"瞬时"而非卡顿。
+  - **Anthropic API context compaction(beta)**:在接近一个**可配置阈值**时自动摘要并替换旧上下文。
+  - **基准跑分(如 BrowseComp)**:压缩在 **50k token** 触发,总量上限可到 10M。
+  - **通用经验法则**:到达**窗口 80%** 或**硬上限(如 100k token)** 就在下一次模型调用前压缩。
+  - 一句话:**budget 决定"何时压"(when),下面的方法决定"怎么压"(how)。**
+- 难点在**取舍**:压得太狠会丢掉"当时不起眼、后来才关键"的上下文。**压缩不可逆**——很难预知未来哪些 token 还会被用到。Anthropic 的解法是把上下文**持久化存储**:若五次 reset 之后某一步又需要早先的工具结果,harness 能用 `getEvents()` 从持久日志里捞回来。
 - 调优方法:**先最大化 recall**(确保摘要 prompt 捕获 trace 里每条相关信息),**再迭代提升 precision**(剔除冗余)。
-- 最轻量安全的变体:**Tool result clearing**——历史深处的原始工具结果,模型其实不再需要看到,直接清除即可。
+- 最轻量安全的变体:**Tool result clearing**——历史深处的、可重新获取的原始工具结果(文件读取、API 响应),模型其实不再需要看到,用 `clear_tool_uses` 直接清除即可。**何时用它而非压缩**:当上下文被"大体积、可重新拉取的工具输出"主导时,优先清除;当上下文被"长篇分析对话"主导时,才用压缩。
+
+> 模型演进的注脚:Sonnet 4.5 会因感知到窗口将满而**提前草草收尾**(被称为 "context anxiety"),需要在 harness 里加 context reset 来缓解;但同样的 harness 用在 Opus 4.5 上该行为消失,reset 反成累赘。**越强的模型需要越少的规定式工程**——阈值要随模型迭代复测,不要写死。
 
 **② 结构化笔记(Note-taking)** —— 适合有清晰里程碑的迭代开发
 - agent 维护轻量标识符(文件路径、查询、链接),**按需即时加载(just-in-time)**,逐层装配理解,而不是一次性塞满。
@@ -185,14 +227,27 @@ system prompt 通常包含:身份与规则、环境信息(cwd、git 状态、平
 **③ 多 agent 架构(Subagent)** —— 适合复杂研究/分析
 - 每个 subagent 用全新上下文窗口大量探索(几万 token),只回传**浓缩摘要(通常 1000–2000 token)**。
 - 实现关注点分离:细节搜索上下文留在 subagent 内,主 agent 专注综合分析。在复杂研究任务上显著优于单 agent。
+- **什么时候该 spawn,什么时候不该(三条判据:隔离 / 专精 / 重启)**:
+
+| 该 spawn | 不该 spawn |
+|----------|------------|
+| **上下文隔离**:子任务会产生大量中间上下文(如逐个审十份合同),不想污染主窗口 | **单步小活**:为"取一个 URL 返回一句话"开 subagent 纯属浪费 |
+| **并行独立子任务**:主 agent 不需要其中一个的结果就能启动另一个 | 子任务与主线强耦合、必须串行 |
+| **专精/关注点分离**:不同工具集、不同 prompt、独立探索路径 | 主 agent 自己几步就能做完 |
+| **组件超出主 agent 限制**:需要超长响应或超大请求 | 任务无法自然分解为独立域 |
+
+> Anthropic 多 agent 系统踩过的坑:早期 agent 会**为简单查询 spawn 50 个 subagent**、为不存在的来源无限翻网、互相用过量更新干扰。教训:subagent **不免费**(token、协调、失败模式都翻倍),要约束。
+> **嵌套与并发控制**:默认**最大深度=1**(子 agent 不能再生孙 agent,Codex `agents.max_depth` 默认 1;很多框架直接禁止);并发 WIP **3–5 个**为甜区(别开到你 review 不过来);**kill 判据**:同一错误卡 ≥3 轮就停掉重派;用激进超时(2–5 分钟)+ fallback。深度分解时用"feature lead"两层扇出,而非主 agent 直接扇出六个,保持主上下文干净。
 
 **技术选型对照:**
 
-| 任务类型 | 推荐技术 |
-|----------|----------|
-| 需要大量来回对话、保持连贯 | 压缩(Compaction) |
-| 有清晰里程碑的迭代开发 | 结构化笔记 |
-| 复杂研究、可并行探索 | 多 agent 架构 |
+| 任务类型 | 推荐技术 | 触发/用法要点 |
+|----------|----------|----------------|
+| 需要大量来回对话、保持连贯 | 压缩(Compaction) | 80–98% 窗口或硬上限触发;先 recall 后 precision |
+| 上下文被大体积可重取工具输出占满 | Tool result clearing | 清除历史深处原始工具结果,最轻量 |
+| 有清晰里程碑的迭代开发 | 结构化笔记 | just-in-time 加载标识符 |
+| 复杂研究、可并行探索 | 多 agent 架构 | 隔离/专精/重启三判据;深度≤1、并发3–5 |
+| 知识需跨会话存活 | 记忆系统(见 5.5) | 写入要选择性、带时间戳 |
 
 ### 5.4 跨会话的长任务:用"持久产物"而非只靠上下文
 
@@ -213,12 +268,74 @@ system prompt 通常包含:身份与规则、环境信息(cwd、git 状态、平
 
 > 核心转变:**从"努力保留上下文"转向"创建持久、可查询的记录"**,让新会话能高效解析。
 
-### 5.5 记忆分层
+### 5.5 记忆系统:短期 vs 长期(到底怎么区分、什么进长期、何时写、怎么取)
 
-- **短期记忆**:上下文内学习(in-context),即对话历史。
-- **长期记忆**:外部向量库 + 快速检索,跨会话保留。
-- **记忆分类**:episodic(事件)/ semantic(事实)/ user-specific(用户画像)。
-- 检索按 **recency + relevance** 过滤;设置**保留策略**(过期、脱敏、同意)防止膨胀与漂移。
+这是初学者最容易含糊的一节。下面把"区分标准 / 写入时机 / 检索方式"全部落到可执行判据。理论框架来自认知科学的 **CoALA**(Cognitive Architectures for Language Agents, Princeton/CMU, arXiv:2309.02427),它把记忆分为 working(工作)与 long-term(长期),长期再分 episodic / semantic / procedural 三类——这套分类已被 Letta、Mem0、LangChain 等主流框架采用。
+
+#### (1) 短期 vs 长期:用"在不在推理热路径上"来区分
+
+| 维度 | 短期/工作记忆 | 长期记忆 |
+|------|---------------|----------|
+| **本质** | 当前任务的活动工作集,就是 messages 数组 | 持久化、可索引的外部存储 |
+| **在不在热路径** | **在**,同步,每次推理都被读;每个 token 都在花钱、影响 TTFT | **不在**,异步;只在需要时用检索(RAG)拉进窗口 |
+| **生命周期** | 默认易失,对话结束即消失(除非显式保存) | 跨会话持久,可被未来任务复用 |
+| **典型实现** | 滑动窗口(保留最近 N 轮)+ token 预算裁剪 | 向量库 / 实体库 / 知识图谱 + 检索 |
+| **何时用** | 立即、当前任务所需 | 需要回忆过去的事实、偏好、决策、技能 |
+
+> **关键设计原则:刻意地在两层之间搬运信息。** 短期是"当前任务活动集",长期"为未来工作保留事实、偏好、过往决策"。好系统**有意识地**把信号从短期搬到长期(这一步叫 consolidation,认知压缩——从对话噪声里隔离出有价值的信号)。
+> **大窗口不能替代结构化记忆**:128K–1M 窗口只是**推迟**而非**消除**记忆失败;把全历史塞进去会让成本、延迟、可靠性同时恶化。Letta 的反直觉实测:**朴素文件系统在记忆任务上拿 74%,反超不少专用向量库记忆库**——别上来就堆复杂方案。
+
+#### (2) 什么内容算"长期记忆"——三类各存什么、各不要存什么
+
+| 类型 | 回答的问题 | **该存什么** | **不该存 / 注意** |
+|------|-----------|-------------|-------------------|
+| **Episodic(情节)** | "发生过什么?" | 带时间戳的交互历史、任务轨迹(状态-动作-结果)、具体经历。例:"周二用户抱怨弟弟 Mark 总忘记他生日,我做了共情回应。[created_at=2025-08-25]" | **不要在写入时就摘要**——会把不同情节坍缩成泛化语义,毁掉情节信号。必须把"事件+上下文(时间/地点/因果)"绑定存够分辨率 |
+| **Semantic(语义)** | "X 是什么?" | 事实、定义、世界知识、业务术语、指标定义、实体关系、用户画像。例:"用户对弟弟感到沮丧" | **必须策展**,不是什么都进——否则变垃圾抽屉。注意:通用世界知识预训练已覆盖,**企业专属定义才是真正的缺口** |
+| **Procedural(程序)** | "怎么做?" | 工作流、工具用法、子 agent 协调、决策规则。三种载体:in-weights(训练进参数)/ code-embedded(执行器逻辑、工具定义)/ explicit(system prompt、规则库) | 高频流程(如第 100 次处理密码重置)沉淀为程序记忆,免得每次从头推理 |
+
+**选择性写入(最强的反复出现的建议):**
+- **别泛泛地"建记忆"**:需要 episodic 就建 episodic,用例长大需要 semantic 再建 semantic;**别在需要前就把三种都建齐**。
+- **避开"全存"陷阱**:存每一句 "hello"/"thank you" 会稀释索引;用过滤器**只存实质性的具体任务**。
+- **规划剪枝**:短期用 LRU;长期用相关性分定期剪;**6 个月没被检索过 → 移入冷存储**。
+- **用时间戳/版本解决冲突**:每条摘要/压缩打时间戳或版本,帮 agent 判断哪条才是当前为真。
+- **保留原始记录**:别只靠摘要(会漂移/丢细节),需要时能回到"真正发生了什么"。
+
+#### (3) 何时写入 / 何时巩固——用"重要性阈值"触发(可执行)
+
+"何时写记忆"在 CoALA 里就是一个由决策过程选择的 **learning action**。最经典的可落地机制来自 **Generative Agents**(Park et al., 2023):
+
+- **写入时打重要性分**:每条观察由 LLM 打 **1–10** 分(1=刷牙这种琐事,10=离婚/入学这种大事)。
+- **巩固(reflection)的触发阈值**:当**最近若干条观察的重要性分之和超过阈值(论文实现里是 150)** 时,触发一次 reflection——把零散低分观察合成高层洞察。实测下来 agent 每天反思约 2–3 次。
+  - 例:"Klaus 桌上有论文" + "Klaus 谈起他的研究项目" + "Klaus 在图书馆熬夜",单条都低分,合成出一条高分洞察:"Klaus 正忙于一个重要的研究截止日期"。
+  - reflection 可递归(对反思再反思),记忆流随时间形成分层:底层原始观察 → 低层反思 → 高层反思 → 关于人/地/模式的持久结论。这正是 **episodic → semantic 的巩固**。
+- **代价与取舍**:每次写入多一次模型调用、评分会随模型版本漂移、对高吞吐 agent 偏贵。消融实验显示 **reflection 对正确综合与决策至关重要**,但工程上要权衡频率。
+
+#### (4) 怎么检索——recency × relevance × importance 加权
+
+Generative Agents 的检索分:`score = α_recency·recency + α_importance·importance + α_relevance·relevance`(论文里三个 α 都=1,三项各自 min-max 归一化到 [0,1])。一条生产级检索管线长这样:
+
+```
+query 向量化 → 取 top-k≈20 候选 → 按 relevance×recency×type_weight 打分
+            (type_weight 例:semantic 0.6 / episodic 0.3 / procedural 0.1)
+            → 注入 top-5、控制在 ~200 token 以内
+```
+- **重排能提多跳**:LLM 重排让多跳问答分数 +15%。
+- **记忆检索 ≠ 静态 RAG**:RAG 搜静态文档;记忆检索是**随交互动态适应**的。
+
+**要主动设计防范的检索失败模式:**
+- **语义≠因果**:相似度搜索会返回"看起来相关但不是因果"的记忆——embedding 擅长"长得像",不懂"这是原因"。
+- **记忆盲区(memory blindness)**:分层系统里关键事实再也没浮上来——滑窗已经移走,或你只取 top-10 而要的恰好是第 11 条。
+- **时间查询很难**:"上周一发生了什么"这类很难检索好;一项 2025 基准里最强模型在"时序意识"上也只有 ~0.29(<30%)。
+
+#### (5) 存储后端怎么选
+
+- **纯文本 + 向量检索**:最简单、保留语气细节,但检索常不精准("我弟的工作是什么"会把所有提到"弟弟+工作"的都召回)。
+- **结构化/实体库**:适合语义画像,可按字段精确过滤、覆盖更新(直接改字段)。
+- **知识图谱**:擅长关系遍历、实体消歧、依赖求解;且能给旧事实打 `invalid_at` 而非覆盖,保留历史。需要 schema/边权设计。
+- **共识是混合**:向量搜做快速语义召回(top-k)→ 图遍历做关系校验。
+- **参考生产栈**:Redis 存短期会话态 + Qdrant 存长期 + 异步 worker 在会话结束后抽取事实、更新图。即"用短期满足即时检索,长期在后台慢慢巩固"。
+
+> 一个清醒的声音(Letta 的 Sarah Wooders):LLM 是 "tokens-in-tokens-out 的函数,不是大脑",过度拟人的认知类比对工程未必合适。把上面的认知分类当**好用的工程脚手架**,而非教条。
 
 ---
 
@@ -363,6 +480,21 @@ ReAct 模式可靠,但规模化后会暴露问题:
 - [OpenHarness (HKUDS, GitHub)](https://github.com/HKUDS/OpenHarness) — 可研读的开源 Python harness 实现
 - [Claude Code Harness Pattern 4: Permission Systems and Safety Guardrails](https://kenhuangus.substack.com/p/claude-code-harness-pattern-4-permission)
 - [What is an AI agent harness? (Databricks)](https://www.databricks.com/blog/ai-harness)
+
+**记忆系统(短期/长期、巩固、检索):**
+- [Cognitive Architectures for Language Agents (CoALA, arXiv:2309.02427)](https://arxiv.org/abs/2309.02427) — working/long-term + episodic/semantic/procedural 的学术框架
+- [Generative Agents: Interactive Simulacra of Human Behavior (Park et al., 2023)](https://dl.acm.org/doi/fullHtml/10.1145/3586183.3606763) — 重要性分 1–10、阈值 150 触发 reflection、recency×importance×relevance 检索
+- [Short-Term vs Long-Term Memory in AI (Mem0)](https://mem0.ai/blog/short-term-vs-long-term-memory-in-ai)
+- [Beyond Short-term Memory: 3 Types of Long-term Memory (MachineLearningMastery)](https://machinelearningmastery.com/beyond-short-term-memory-the-3-types-of-long-term-memory-ai-agents-need/)
+- [A Practical Guide to Memory for Autonomous LLM Agents (Towards Data Science)](https://towardsdatascience.com/a-practical-guide-to-memory-for-autonomous-llm-agents/)
+- [Memory in the Age of AI Agents: A Survey (arXiv:2512.13564)](https://github.com/Shichun-Liu/Agent-Memory-Paper-List)
+
+**错误处理 / 重试 / subagent 编排:**
+- [Your ReAct Agent Is Wasting 90% of Its Retries (Towards Data Science)](https://towardsdatascience.com/your-react-agent-is-wasting-90-of-its-retries-heres-how-to-stop-it/) — 错误分类与重试预算
+- [4 Fault Tolerance Patterns Every AI Agent Needs in Production (DEV)](https://dev.to/klement_gunndu/4-fault-tolerance-patterns-every-ai-agent-needs-in-production-jih)
+- [AWS SDK Retry behavior](https://docs.aws.amazon.com/sdkref/latest/guide/feature-retry-behavior.html) — transient/throttling/non-retryable 分类、full jitter
+- [Subagent Orchestration: When to Spawn vs Do It Yourself (DEV)](https://dev.to/bobrenze/ai-agent-subagent-orchestration-when-to-spawn-vs-when-to-do-it-yourself-4opg)
+- [Four Subagent Patterns in 2026 (Phil Schmid)](https://www.philschmid.de/subagent-patterns-2026)
 
 ---
 

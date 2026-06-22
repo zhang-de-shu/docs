@@ -1,7 +1,20 @@
 # Qwen3.5 技术原理详解
 
-> 发布方：阿里巴巴通义千问（Qwen）团队。**Qwen3.5 开源模型家族**于 2026 年初（除夕夜/2 月）正式开源，覆盖 **0.8B 端侧小模型 → 397B 旗舰 MoE**，共 8 个尺寸；并有原生多模态版 **Qwen3.5-Omni**。这是当前可下载权重、且架构已公开的最新一代 Qwen 开源模型（注：同期的 Qwen3.7-Max 属闭源旗舰 API，本文不以其为主体）。
+> 发布方：阿里巴巴通义千问（Qwen）团队。**Qwen3.5 开源模型家族**于 2026 年初正式开源，覆盖 **0.8B 端侧小模型 → 397B 旗舰 MoE**，共 8 个尺寸；并有原生多模态版 **Qwen3.5-Omni**。这是当前可下载权重、且架构已公开的最新一代 Qwen 开源模型（注：同期的 Qwen3.7-Max 属闭源旗舰 API，本文不以其为主体）。
 > 本文重点讲**技术原理（机制怎么做的）**，而非罗列特性。核心三块：**Gated DeltaNet 线性注意力**、**3:1 混合注意力架构**、**稀疏 MoE**。
+>
+> **发布节奏（已核实）**：旗舰 **Qwen3.5-397B-A17B** 于 **2026-02-16** 首发；2026-02-24 放出 122B-A10B / 35B-A3B / 27B；2026-03-02 放出 9B / 4B / 2B / 0.8B；多模态 **Qwen3.5-Omni** 技术报告于 2026-04 上 arXiv（2604.15804）。全系 **Apache 2.0** 许可。架构并非全新发明，而是把 **Qwen3-Next / Qwen3-Coder-Next** 验证过的"混合注意力 + Hybrid MoE"正式吸收进主线。
+>
+> | 旗舰 Qwen3.5-397B-A17B 关键规格 | 数值（已核实，来源：HF / NVIDIA 模型卡） |
+> |------|------|
+> | 总参 / 单 token 激活参 | 397B / 17B |
+> | 层数 | 60 |
+> | 隐藏维度 | 4,096 |
+> | 专家数 | 512（每 token 激活 **10 路由 + 1 共享**） |
+> | 专家中间维度 | 1,024（细粒度专家） |
+> | 词表 | 248,320 |
+> | 原生上下文 | 262,144（YaRN 可扩至 ~1M） |
+> | 解码吞吐 | 较 Qwen3-Max **快 8.6x（32K）~ 19x（256K）** |
 
 ---
 
@@ -18,7 +31,9 @@
 | 前馈层 | Dense / MoE | 稀疏 **MoE**（旗舰 397B） | 大而不贵 |
 | 尺寸覆盖 | 多尺寸 | **0.8B → 397B** 全场景 + Omni 多模态 | 端到云全覆盖 |
 
-**关键能力**：旗舰 397B MoE；支持 **262K 长文本**；Qwen3.5-Omni 在 215 项音视频基准拿到 SOTA。整套架构的落点就是"既快又省又不掉质量"。
+**关键能力**：旗舰 397B MoE（激活 17B）；**262,144 原生上下文**（YaRN RoPE 缩放可扩至约 1M）；Qwen3.5-Omni-plus 在 **215 项**音视频理解/推理/交互子任务与基准上拿到 SOTA（据 Qwen3.5-Omni 技术报告，关键音频任务超过 Gemini-3.1 Pro、综合音视频理解与其相当）。整套架构的落点就是"既快又省又不掉质量"。
+
+> **为什么把"长上下文降本"当主线？** 全注意力的 KV cache 随上下文线性膨胀、算力随 O(N²) 膨胀，到 256K 这种长度时显存与延迟都不可承受。Qwen3.5 在 Qwen3-Next 的实验里得到一个清晰结论：**纯线性注意力快但召回弱、纯全注意力准但推理慢**——于是用 3:1 混合把两者调和，官方报告其在 32K 处解码快约 8.6 倍、256K 处快约 19 倍（对比 Qwen3-Max），同时长上下文 KV-cache 显存约降 4 倍。这就是"工业可用"的含义。
 
 ---
 
@@ -57,6 +72,10 @@ Gated DeltaNet 层还用**卷积**增强对局部(邻近 token)模式的捕捉�
 
 O(1) 是关键工程收益:线性注意力层推理时只维护一个**固定大小的状态**,不像全注意力要存全量 KV cache——**显存不随上下文增长**,这是 Qwen3.5 能在工业级大模型上吃下长上下文的根本。
 
+> **训练侧如何不丢并行性?** RNN 式递推天生是串行的(第 t 步依赖第 t-1 步),历史上这是线性注意力打不过 Transformer 的死穴。Gated DeltaNet 用 **chunk-wise(分块)并行**的数学形式绕开:把序列切成块,块内用矩阵运算并行、块间传递状态,从而在 GPU 上达到与 FlashAttention / Mamba2 同级的吞吐。工程上 Qwen3.5 借助 **Flash Linear Attention 的 Triton 内核**实现,并配一个能同时管理线性层状态与全注意力 KV 的**混合 KV cache 管理器**,避免显存碎片。
+>
+> ⚠️ 待核实:部分第三方解读称这一块并行借助 **WY Representation**(用于并行化 delta-rule 递推的经典 Householder 表示)。该术语在 DeltaNet/Gated DeltaNet 的学术谱系中确有使用,但未在 Qwen 官方材料中明确出现,故仅作背景提及,不作为 Qwen3.5 的确定实现细节。
+
 > **本质:Gated DeltaNet = 把 RNN 的"O(1) 固定状态"和 Transformer 的"精确记忆"调和到一起——用 Delta Rule 写得准、用门控忘得快、用卷积抓局部,既省(O(1))又不掉长程质量。**
 
 ---
@@ -88,16 +107,53 @@ Layer 8: Full Attention
 
 > **本质:用"多数线性层降本 + 少数全注意力层保质量"的混合配比,在长上下文效率和检索精度之间取得平衡。** 这和 DeepSeek-V4 的 CSA/HCA 交错、是同一种"分工混合"哲学的不同实现。
 
+### 2.2 旗舰 397B 的真实层布局(已核实)
+
+NVIDIA 模型卡给出 397B-A17B 的 60 层具体排布,正好印证 3:1:
+
+```
+60 层 = 15 × [ 3 × (Gated DeltaNet → MoE) → 1 × (Gated Attention → MoE) ]
+```
+
+即每个"块"是 3 个线性注意力层 + 1 个门控全注意力层,共重复 15 次。两类层的注意力头配置也不同:
+
+| 层类型 | 头配置(已核实) | 角色 |
+|--------|----------------|------|
+| Gated DeltaNet(线性) | V 头 64、QK 头 16,head dim 128 | 多数层,O(1) 状态扛长序列、抓局部与长期记忆 |
+| Gated Attention(全) | Q 头 32、KV 头 2(GQA),head dim 256,RoPE dim 64 | 每 4 层 1 次,精确全局检索"兜底" |
+
+> **细节里的设计取舍**:全注意力层用 **GQA(Q 头 32 / KV 头仅 2)**进一步压它自己的 KV cache——既然它是少数派负责"保精度",也要尽量省;RoPE 只作用在全注意力层(线性层靠递推状态隐式编码顺序),这是混合架构里位置编码分工的典型做法。Qwen3-Next 的消融显示:3:1 混合**同时优于**任何单一架构(纯线性或纯全注意力),即"更准且更省",这正是 Qwen3.5 把它扶正为主线的依据。
+
 ---
 
 ## 3. 稀疏 MoE(大而不贵)
 
 Qwen3.5 旗舰 **397B** 用稀疏 MoE:前馈层拆成多专家,每 token 只激活少数,"总参大、单 token 算得少"。这一代延续了 Qwen 的 MoE 路线(细粒度专家 + 稀疏激活),与混合注意力叠加:
 
+> **真实配置(已核实)**:**512 个专家**,每 token 激活 **10 个路由专家 + 1 个共享专家**,专家中间维度仅 **1,024**(细粒度切分)。专家数较初代 Qwen3 的 128 翻到 4 倍,但激活面更稀疏——397B 总参里单 token 只走 **17B(约 4.3%)**,相对等容量 Dense 模型激活内存约降 95%。**共享专家**始终激活,负责跨任务的通用特征;**路由专家**按 token 动态选 Top-10,负责专精能力。
+
 - **注意力侧**:Gated DeltaNet 把"长度维度"的成本压成 O(1);
 - **前馈侧**:MoE 把"参数维度"的成本压成稀疏激活;
 
 两者正交叠加,共同实现"397B 的容量、却只付一小部分推理代价"。再配合 **0.8B → 397B 全尺寸**,同一套架构思想从端侧贯穿到云端旗舰。
+
+---
+
+## 3.5 Qwen3.5-Omni:把同一套混合架构搬进多模态
+
+多模态版 **Qwen3.5-Omni**(技术报告 arXiv:2604.15804)是"主线架构外溢"的最好例证——它没有另起炉灶,而是把 Qwen3.5 的 **Hybrid MoE + Gated DeltaNet** 直接用进音视频。
+
+| Omni 机制(已核实) | 做了什么 | 为什么这么做 |
+|------|----------|------|
+| Thinker–Talker 框架 | Thinker 负责理解与推理,Talker 负责语音生成,两者**都**采用 Hybrid-Attention MoE | 沿用统一架构,理解侧与生成侧都享受 GDN 的长序列加速 |
+| GDN 模块 | 加速长音视频序列建模 | 长音视频 token 极多,GDN 显著降低长上下文 **KV-cache I/O 开销**,提升吞吐与并发 |
+| 256K 长上下文 | 支持 >10 小时音频、>400 秒 720P 音视频(1 FPS) | 真实音视频流极长,必须靠线性注意力撑住 |
+| ARIA 流式对齐 | 解码时动态对齐文本与语音单元 | 流式 TTS 的自然度与鲁棒性靠它 |
+| 多码本(multi-codebook)编解码 | 单帧即时合成 | 降低首包延迟,实时语音 |
+
+> **为什么 Omni 是"架构正确性"的旁证**:一套注意力/MoE 设计若只在纯文本上成立,价值有限;Qwen3.5 把它**无改写地复用到音视频长序列**且拿到 215 项 SOTA,说明"GDN 线性注意力 + 3:1 混合 + Hybrid MoE"是一种**模态无关的长序列降本范式**,而非针对文本的特例。报告中还观察到新涌现能力——直接按音视频指令写代码(Audio-Visual Vibe Coding)。
+>
+> ⚠️ 待核实(语言覆盖数):不同来源对 Qwen3.5 语言数说法不一(有"201 语言"的说法;Omni 报告则给出语音识别 113 种语言/方言、语音合成 36 种)。具体口径以官方发布页/技术报告为准,此处不强行统一数字。
 
 ---
 
@@ -138,5 +194,19 @@ Qwen3.5 旗舰 **397B** 用稀疏 MoE:前馈层拆成多专家,每 token 只激�
 
 ---
 
-> 说明:本文事实经联网多源交叉核实(Qwen3.5 2026年初开源、0.8B~397B共8尺寸、Gated DeltaNet线性注意力+全注意力3:1混合、Delta Rule精确写入+门控快速遗忘+卷积+O(1)推理、稀疏MoE、262K长文本、Qwen3.5-Omni 215项音视频SOTA)。Delta Rule/门控/线性注意力等机制按已公开的技术解读阐述,具体超参与未公开训练细节未编造。同期Qwen3.7-Max为闭源旗舰,按你的要求本文以"最新开源版Qwen3.5"为主体。
-```
+> 说明:本文事实经联网多源交叉核实。**已核实**:Qwen3.5 于 2026-02 起分批开源、0.8B~397B 共 8 尺寸、Apache 2.0;旗舰 397B-A17B(60 层、hidden 4096、词表 248,320、512 专家激活 10 路由+1 共享、专家中间维 1024);60 层 = 15×(3×GDN→1×Gated Attention) 的 3:1 混合;GDN/全注意力头配置;262,144 原生上下文(YaRN 可扩 ~1M);较 Qwen3-Max 解码快 8.6x(32K)~19x(256K);沿用 Qwen3-Next/Coder-Next;Qwen3.5-Omni(arXiv:2604.15804)Thinker–Talker + Hybrid MoE + GDN、256K、ARIA、215 项音视频 SOTA。**待核实**(已在正文用 ⚠️ 标注):WY Representation 是否为 Qwen3.5 官方实现术语;语言覆盖具体数字口径。Delta Rule/门控/卷积等机制按已公开技术解读阐述,未公开的训练超参未编造。同期 Qwen3.7-Max 为闭源旗舰,按要求本文以"最新开源版 Qwen3.5"为主体。
+
+---
+
+## 参考来源(可点击链接)
+
+- [Qwen/Qwen3.5-397B-A17B · Hugging Face](https://huggingface.co/Qwen/Qwen3.5-397B-A17B)
+- [qwen3.5-397b-a17b Model Card · NVIDIA build](https://build.nvidia.com/qwen/qwen3.5-397b-a17b/modelcard)
+- [Qwen3.5-Omni Technical Report · arXiv:2604.15804](https://arxiv.org/abs/2604.15804)
+- [Qwen3.5: Nobody Agrees on Attention Anymore · Hugging Face Blog (mlabonne)](https://huggingface.co/blog/mlabonne/qwen35)
+- [A Dream of Spring for Open-Weight LLMs: 10 Architectures from Jan–Feb 2026 · Sebastian Raschka](https://magazine.sebastianraschka.com/p/a-dream-of-spring-for-open-weight)
+- [vLLM Now Supports Qwen3-Next: Hybrid Architecture with Extreme Efficiency · vLLM Blog](https://blog.vllm.ai/2025/09/11/qwen3-next.html)
+- [Qwen3-Next-80B-A3B-Instruct · qwen.ai blog](https://qwen.ai/blog?id=4074cca80393150c248e508aa62983f9cb7d27cd)
+- [Why Did Qwen3.5 Choose Gated DeltaNet? · laonpeople](https://laonpeople.com/en/blog/why-did-qwen3-5-choose-gated-deltanet/)
+- [Deploy Qwen 3.5 on GPU Cloud: GDN Hybrid Architecture, 262K Context · Spheron](https://www.spheron.network/blog/deploy-qwen-3-5-gpu-cloud/)
+- [Qwen3.5 - SGLang Documentation](https://docs.sglang.io/cookbook/autoregressive/Qwen/Qwen3.5)

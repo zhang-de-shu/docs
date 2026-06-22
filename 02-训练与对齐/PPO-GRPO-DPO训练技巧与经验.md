@@ -28,6 +28,35 @@
 - **RLHF**:奖励来自训练好的 **reward model**(拟合人类偏好),用于通用对齐、安全、风格。
 - **RLVR**(Reinforcement Learning with Verifiable Rewards):奖励来自**程序化验证器**(单测通过、答案匹配),用于数学/代码,无需 reward model。GRPO 在 RLVR 上特别流行。
 
+### 0.1 选型决策表(先看这张:按"你手里有什么"决定)
+
+选型不是从"谁先进"出发,而是从**三个可观测条件**出发:(1) 能不能在线采样并打分?(2) 奖励信号是可验证的还是要训 reward model?(3) 算力预算多少?照下表对号入座:
+
+| 你的处境(判据) | 推荐 | 为什么 |
+|------|------|------|
+| 有验证器(单测/标准答案)+ 能在线采样 | **GRPO(+RLVR)** | 奖励 0/1 可验证、无需 RM,组内相对优势省掉 critic,最划算 |
+| 有人类偏好需在线探索 + 算力充足(可同时驻留 4 模型) | **PPO** | 成熟可控,critic 给的 GAE 在密集/长程奖励下方差更低 |
+| 只有离线偏好对(chosen/rejected)+ 要快要省 | **DPO** | 像 SFT 一样训,2 个模型,无需采样;注意似然位移 |
+| 只有单边"好/坏"标签、凑不出成对 | **KTO** | 用前景理论,只需单点标签 |
+| 想再省一个 reference 模型 | **SimPO / ORPO** | 去掉 ref;但 SimPO 需更细调参 |
+| MoE 大模型做在线 RL | **GSPO** | token 级重要性比在 MoE 上方差爆炸,改序列级 |
+| 大规模长链推理 RL 不稳 | **GRPO + DAPO 四件套** | Clip-Higher / 动态采样 / token 级 loss / 超长整形 |
+
+> **一条贯穿全表的判据:奖励是否"可验证"。** 可验证 → RLVR 路线(GRPO,常可去 KL);只能拟合人类偏好 → RM 路线(PPO/DPO,务必保留对 ref 的约束)。
+
+### 0.2 要不要上 RL?先过这道"SFT 够不够"的筛子
+
+**默认先把 SFT 做透,只有命中下列判据才上偏好/RL:**
+
+| 判据 | 选 SFT | 选 偏好对齐 / RL |
+|------|--------|------|
+| 答案形态 | 有**唯一正确**的标准输出 | 没有唯一答案,只有"更好/更差" |
+| 你拥有的数据 | 大量高质量 **(输入,输出)** 对(典型 5k~100k) | 有限 ground truth,但有大量"A 比 B 好"的判断 |
+| 想优化的东西 | 任务准确率、格式、知识注入 | 帮助性 / 安全 / 风格 / 推理深度等主观或难显式指标 |
+| 数据稀缺但任务可验证 | — | **RL 在小数据下常胜过 SFT**(可验证奖励能从少量样本榨出泛化) |
+
+> **机制层面的理由:** SFT 是"模仿单一正确答案"的最大似然;它没法表达"这两个都通顺,但 A 更好"。当目标是相对偏好或可验证的正确性时,需要奖励/偏好信号。**但 RL 不能替代 SFT——DPO 的 ref 通常就是 SFT 模型,跳过 SFT 会让偏好数据对当前策略"离分布",学不动。** 标准链路:先 SFT 把答案拉进分布,再用偏好/RL 拉开好坏。
+
 ---
 
 ## 1. PPO:经典在线 RL 的地基
@@ -79,6 +108,25 @@ RLHF 里还要加 **KL 散度惩罚**,把 policy 拉住、别离 SFT/reference �
 - **KL 系数自适应**:目标 KL 偏离时动态调 β(adaptive KL controller)。
 - **critic 预热**:value 没学好时优势全是噪声,可先单独 warm up critic。
 - **小 ε、小 lr**:RLHF 中 ε 常取 0.1~0.2,lr 比 SFT 小 1~2 个数量级。
+
+### 1.7 PPO 超参取值与判据(速查)
+
+| 超参 | 推荐区间 | 怎么判断 / 触发条件 |
+|------|----------|----------|
+| clip ε | **0.2**(标准),保守可 0.1 | clip 触发比例(被截断的 token 占比)持续 >50% 说明步长太大,调小 lr 或 ε;接近 0 说明几乎没在更新 |
+| policy lr | 1e-6 量级(DeepSeekMath-7B 用 **1e-6**),比 SFT 小 1~2 数量级 | reward 震荡/KL 跳变 → 调小 |
+| KL 目标 / β | 用 **adaptive KL controller** 设一个目标 KL,β 自动调 | 见 1.8 |
+| 每批更新次数 | PPO 常 **2~4 次**(对同一 batch 多步) | 多步会放大 off-policy 偏差,KL 跑高就减步数 |
+
+> **关于固定 β 的陷阱:** 训练早期策略≈ref,小更新只产生很小 KL;到中后期策略已经漂移,**同一个 β 早期可能太松(挡不住 hacking)、后期又太紧(学不动)**。所以工业界普遍用**自适应 KL**:把它当反馈控制——离 ref 太远就收紧、太近就放松,稳定在一个目标 KL 上。
+
+### 1.8 KL 跑飞的信号与处置(PPO/GRPO 通用)
+
+**reward hacking 的金标准信号:** **KL 持续上涨,同时"代理奖励(proxy,即 RM 打分)上升、真实质量(gold,人评/留出验证)却走平或下跌"** —— 这个 proxy 与 gold 的背离就是过优化(over-optimization)的特征。处置:
+
+- **触发条件 → 动作**:目标 KL 被持续突破 → 调大 β / 调小 lr;proxy-gold gap 张开 → **早停**或回滚到 gap 张开前的 checkpoint。
+- **警惕:KL 本身是"漏的"检测器。** 标量 KL 把所有 token 的偏移平均成一个数,**局部、低概率的作弊(如突然变谄媚)对全局 KL 几乎没贡献却能拿高分**。所以别只看平均 KL,要按域切片看(长上下文、多步工具调用、多语言、边界意图等,事故常聚集在这些切片),并辅以行为级 diff,而非只盯 token 级散度。
+- **参考模型何时更新**:固定 ref 是默认且最安全的做法。只有在**迭代式**训练里才更新 ref——用上一轮训出的模型当新 ref(如 Pre-DPO 的 guiding reference),让数据更贴合当前策略;但注意**收益逐轮递减**,且 ref 更新过快会失去"锚定 base 能力"的作用。
 
 ---
 
@@ -150,6 +198,40 @@ Qwen 团队的 **GSPO**(Group Sequence Policy Optimization)指出:GRPO 的 **tok
 - **reward 设计从简**:可验证场景优先 0/1 outcome reward,慎用复杂塑形(易被 hack)。
 - **MoE 用序列级**(GSPO)而非 token 级重要性比。
 
+### 2.9 GRPO 超参取值与判据(速查)
+
+| 超参 | 推荐区间 | 判据 / 触发条件 | 业界锚点 |
+|------|----------|----------|----------|
+| group size G | 7B+:**16~64**;1.5B 小模型:**4 起步,8 后收益递减** | G 越大优势估计越稳但越贵;组内奖励**全同(全对/全错)→ 优势恒 0**,该 prompt 应被动态采样过滤 | DeepSeekMath-7B 用 **G=64**;TRL/R1 用 **16**;现代框架默认常 16 |
+| clip ε | **0.2**(标准) | Clip-Higher 时上界放宽(见下) | DeepSeek-R1 罕见地用过 **ε=10** 配合无 KL |
+| KL 系数 β | **0.0(纯 RLVR 直接去掉)~ 0.01**;sweet spot 常在 **0.0075~0.01** | β 对精度**非单调**:适中最好,增到 0.04 反而显著掉点(约束过强抑制探索) | DeepSeekMath 用 **0.04**;R1 用 **0.001**;DAPO/部分框架 **0.0** |
+| policy lr | **1e-6** 量级 | 同 PPO | DeepSeekMath **1e-6**,R1 约 **3e-7** |
+| 采样温度 | **0.7~1.0** | 低于此则候选雷同、优势塌成 0;但温度**单独**不足以防熵坍塌 | Axolotl 示例 0.7;多篇熵研究用 1.0 |
+| Clip-Higher 上界 ε_high | **0.28**(下界 ε_low 仍 0.2) | 熵坍塌时启用:给低概率 token 上升空间 | DAPO |
+
+> **β 非单调是关键反直觉点:** 不是"KL 约束越松学得越猛"。约束过强会把策略锁死、压制有益探索;约束为 0 在可验证场景反而常最优。所以 RLVR 下默认先试 **β=0**,RLHF 下才需要一个不为零的 β 来防语言退化。
+
+### 2.10 熵坍塌的监控阈值与处置
+
+熵坍塌是 GRPO 最常见的失败:**策略熵在训练一开始就急剧下降、随后单调走低**,输出收敛成几乎相同的答案、不再探索(几乎所有实验都观察到这一规律,熵与精度常可拟合成指数关系——RL 一路"拿熵换 reward")。
+
+| 监控量 | 健康区间 | 报警阈值 → 动作 |
+|------|----------|----------|
+| policy entropy | 约 **0.05~0.5**(模型/任务相关) | **< 0.01 ≈ mode collapse**:提温度、启用 Clip-Higher(ε_high≈0.28)、加熵正则/高熵 token 掩码 |
+| grad_norm | **0.001~1.0** | **> 10 不稳**;=0 通常是零优势被跳过(正常) |
+| 组内奖励方差 | 应 > 0 | 持续为 0(整组同分)→ 动态采样过滤该 prompt |
+
+> **注意"熵不是越高越好"。** 熵-性能是**非单调**的,存在一个最优探索水平;一味最大化熵会引发熵爆炸、策略不稳。目标是把熵**稳在一个区间**,而非单纯拉高。
+
+### 2.11 GRPO vs PPO 的取舍判据(何时砍 critic 反而吃亏)
+
+| 看这个维度 | 倾向 GRPO | 倾向 PPO |
+|------|------|------|
+| 奖励稀疏度 | **稀疏 / 序列末端 0-1 奖励**(数学对错):组内比较天然适配 | **密集 / 逐 token 奖励、长程信用分配**:critic 的 GAE 更精细 |
+| 算力 | 紧:省掉 critic ~1/3 显存 | 充足:养得起第四个模型 |
+| 一题多解可采性 | 能对同一 prompt 采 G 条 | 采样成本高/难批量 |
+| 工程复杂度 | 想要更简链路 | 已有成熟 PPO 基建 |
+
 ---
 
 ## 3. DPO:把 RL 化简成一个分类 loss
@@ -187,6 +269,17 @@ L_DPO = − E[ log σ( β·log(π_θ(y_w|x)/π_ref(y_w|x)) − β·log(π_θ(y_l
 - **β 小**:更敢偏离,改动激进但可能跑偏。
 KL 约束隐含在 β 里——没有显式 KL 项,但 β 起同样的"别离 ref 太远"作用。
 
+**取值判据:**
+
+| β 取值 | 行为 | 何时选 |
+|------|------|------|
+| **0.1**(最常用默认) | 平衡 | 不确定时从这里起调 |
+| 0.1~0.3 | 偏好优化与稳定的较好平衡 | 一般场景 |
+| 偏小(0.01~0.05) | 学得快但易越跑越远 | 数据干净、想快速学新偏好 |
+| 偏大(0.5) | 保守、保留更多 ref 行为 | 数据噪声大、要稳;但**实测 0.5 常偏高**:rewards margin 大却出现 chosen logp 反低于 rejected 的反常 |
+
+> **判断 β 是否合适,看 rewards margin(chosen 与 rejected 的隐式奖励差):** 这是 DPO 最该盯的指标,应随训练**稳步上升**。β 小则 margin 自然偏大、β 大则偏小;若 margin 大但 chosen 的绝对 logp 反而低于 rejected,说明 β 设得过大、信号自相矛盾,应调小。
+
 ### 3.4 DPO 最危险的坑:似然位移(likelihood displacement)
 
 DPO 一个反直觉的失效模式:**训练中 chosen 的绝对概率也会下降**(只是降得比 rejected 慢)。
@@ -214,13 +307,58 @@ DPO 一个反直觉的失效模式:**训练中 chosen 的绝对概率也会下�
 | **SimPO** | **去掉 ref 模型**,用长度归一化的平均对数概率作隐式奖励 | 省显存、简化(但需小心调参) |
 | **ORPO** | 把 SFT 与偏好合成一步、**无 ref 模型** | 想一步到位、省 reference |
 
-### 3.7 DPO 训练技巧速记
+### 3.7 偏好数据:怎么构造、多少条够、质量判据
+
+| 问题 | 判据 / 阈值 | 说明 |
+|------|----------|------|
+| **最少多少条** | 起效下限约 **1,000 对** | 低于此很难学到稳定信号 |
+| 领域微调 | **1k~5k 高质量对** | 针对单一领域已能见到明显效果 |
+| 一般认真做 DPO | **数千 ~ 数万**(常用甜点约 **1 万**,如 Math-Step-DPO ~10.8k) | OpenAI 给的"thousands to tens of thousands"区间 |
+| 训**独立 reward model**(走 PPO) | **数万 ~ 10 万+** | RM 需要比 DPO 更广的覆盖 |
+| 前沿大模型通用对齐 | **数十万 ~ 百万** | 头部实验室量级 |
+
+**质量判据(比数量更重要):**
+- **质量压倒数量**:5,000 条精挑的对常胜过 50,000 条噪声对。
+- **信号强度**:chosen 与 rejected 的**质量差距要够大**;若两者只是"略好略差",梯度学不到清晰信号。语义/质量距离越大,学习信号越强。
+- **偏序一致**:多条偏好要满足传递性(若 A>B、B>C 则应 A>C),自相矛盾的标注会污染。
+- **prompt 分布要有代表性**、贴合目标场景;且应**对当前 SFT 策略在分布内**(否则学不动)。
+- **构造方式**:可由人工成对标注,或用更强模型 / 验证器自动判优(如 UltraFeedback 这类 AI 标注集);在线/迭代式则用**当前模型生成新候选再打标**,缓解分布漂移。
+
+> **判断"该不该再加数据":** DPO **过拟合极快、常 1 个 epoch 甚至更少就过优化**(过优化甚至在第一个 epoch 跑完前就出现)。若验证集准确率已平台、而训练 loss 还在降——**停训,而不是加数据**。此时加数据不是杠杆,提质量、调 β、早停才是。
+
+### 3.8 DPO 训练技巧速记
 
 - **必须先 SFT**:DPO 的 ref 通常就是 SFT 模型,直接在 base 上做效果差。
-- **小 lr、少 epoch**:DPO 过拟合极快,lr 比 SFT 还小(~5e-7 量级常见)。
-- **监控 chosen/rejected 的绝对 logp**:若 chosen 也在掉,警惕似然位移。
-- **β 从 0.1 起调**:配合数据噪声水平。
+- **小 lr、少 epoch**:DPO 过拟合极快,lr 比 SFT 还小(常见 **1e-7~5e-7** 量级),通常 **1 epoch**(实测 >3 epoch 无增益)。
+- **监控 rewards margin 与绝对 logp**:margin 应稳步上升;若 chosen 的绝对 logp 也在掉,警惕似然位移。
+- **β 从 0.1 起调**:配合数据噪声水平(噪声大调大,数据干净可调小)。
+- **batch size 甜点**:全局 batch **256~512** 对多数模型较好。
 - **混入 NLL 正则**或选 ORPO,稳住 chosen 概率。
+
+> **DPO vs SFT 的选择(同样有数据时):** 若你的偏好对其实只是"一条好答案 + 一条明显烂答案",且你**只在乎那条好答案的形态**,直接 SFT 那条 chosen 往往更省更稳;**只有当"相对偏好/风格/安全"本身是优化目标、且 rejected 携带了有用的负信号时,DPO 才比 SFT 划算**。实践中常见组合:先 SFT 已标注数据,再用偏好对做 DPO 补足主观维度。
+
+---
+
+## 3.9 reward 设计:RLVR vs reward model,与 reward hacking 防范
+
+奖励怎么定,直接决定会不会被 hack。先按"奖励能否被程序判定为对错"分两类:
+
+| 维度 | 可验证奖励(RLVR) | reward model(RLHF) |
+|------|------|------|
+| 来源 | 验证器:单测通过、答案匹配、编译成功 | 训练好的 RM 拟合人类偏好 |
+| 形态 | 优先 **0/1 outcome reward**(结果对错) | 连续打分 |
+| 适用 | 数学 / 代码 / 形式化任务 | 帮助性 / 安全 / 风格等无唯一答案 |
+| hacking 风险 | 低(对错是硬约束) | 高(RM 有可被钻的漏洞) |
+| KL 项 | RLVR 下常**可去**(见 2.7) | **务必保留**,否则语言退化 |
+| 数据 | 不需 RM 训练数据,有验证器即可 | 需数万+ 偏好对训 RM |
+
+> **设计判据:能验证就别训 RM。** 有标准答案/单测时,0/1 可验证奖励既省一个模型、又几乎不可 hack。**慎用复杂 reward shaping**——塑形项越多、越容易被策略找到"高分但低质"的捷径。过程奖励(PRM)只在结果奖励太稀疏、需要中间信号时再加。
+
+**reward hacking 的信号与防范:**
+- **金标准信号**:KL/优化强度上升时,**proxy(RM/塑形分)涨而 gold(人评或留出验证)走平或跌** → 过优化。Gao 等给出的过优化 scaling law 表明这道 gap 随优化强度可预测地张开。
+- **可见的塑形伪影**:回答**无脑变长**(长度与 RM 分虚假相关)、套话/谄媚腔调、固定模板开头——这些往往是 hacking 的先兆。
+- **防范优先级**:① 奖励从简、优先可验证;② RLHF 保留(自适应)KL;③ 切片监控 + proxy-gold gap 跟踪,触发就**早停/回滚**;④ 必要时上鲁棒 RM(如信息瓶颈 InfoRM 的 latent 离群点检测)。
+- **重要限制**:**KL 惩罚并不能根除 hacking**。标量 KL 把偏移平均掉,策略可以在很小的概率质量上做高影响改动(如谄媚),全局 KL 仍很低却已被 hack——所以别把 KL 当唯一护栏。
 
 ---
 
@@ -255,6 +393,21 @@ DPO 一个反直觉的失效模式:**训练中 chosen 的绝对概率也会下�
 | 过拟合偏好数据 | DPO | 少 epoch、小 lr、IPO |
 | KL 拉太紧学不动 | PPO/GRPO | RLVR 下可去 KL;RLHF 自适应 β |
 
+### 5.1 训练监控指标 → 报警阈值 → 动作(速查)
+
+把这张表挂到训练看板上,踩线就处置:
+
+| 指标 | 健康区间 | 报警阈值 | 动作 |
+|------|----------|----------|------|
+| policy entropy | 0.05~0.5 | **< 0.01**(mode collapse) | 提温度、Clip-Higher(ε_high≈0.28)、熵正则 |
+| grad_norm | 0.001~1.0 | **> 10**(不稳) | 调小 lr;=0 多为零优势跳过(正常) |
+| KL(对 ref) | 稳定在目标附近 | **持续突破目标且 gold 走平** | 调大 β/调小 lr;张 gap 即早停回滚 |
+| proxy-gold gap | 不张开 | **proxy 涨、gold 跌** | reward hacking,早停 + 查切片 |
+| clip 触发比例(PPO/GRPO) | 适度 | **>50%** | 步长太大,减 lr 或 ε |
+| 组内奖励方差(GRPO) | > 0 | **= 0**(整组同分) | 动态采样过滤该 prompt |
+| rewards margin(DPO) | 稳步上升 | **平台 / 反向** | 查似然位移、调 β、早停 |
+| chosen 绝对 logp(DPO) | 不大幅下滑 | **持续下降** | 似然位移:加 NLL 正则、降步数 |
+
 ---
 
 ## 6. 一句话总结
@@ -287,6 +440,23 @@ DPO 一个反直觉的失效模式:**训练中 chosen 的绝对概率也会下�
 - [ORPO:Monolithic Preference Optimization without Reference Model](https://arxiv.org/abs/2403.07691)
 - [Likelihood Displacement in DPO(失效模式分析)](https://arxiv.org/abs/2410.08847)
 - [Hugging Face TRL — DPOTrainer 文档](https://huggingface.co/docs/trl/main/en/dpo_trainer)
+
+**超参阈值 / 选型判据 / 监控(本次新增):**
+- [Comparative Analysis and Parametric Tuning of PPO, GRPO, and DAPO(β 非单调、group size 影响)](https://arxiv.org/abs/2512.07611)
+- [verl 文档 — GRPO(clip ε、KL loss 默认值)](https://verl.readthedocs.io/en/latest/algo/grpo.html)
+- [RLinf 文档 — GRPO(group_size=16、温度 0.7~1.0、ratio_clip_eps=0.2)](https://rlinf.readthedocs.io/en/latest/rst_source/tutorials/rlalg/grpo.html)
+- [Axolotl GRPO 文档(熵 0.05~0.5、grad_norm 阈值、温度示例)](https://docs.axolotl.ai/docs/grpo.html)
+- [NeMo-RL — GRPO Walkthrough(熵坍塌监控)](https://docs.nvidia.com/nemo/rl/latest/guides/grpo.html)
+- [The Entropy Mechanism of RL for Reasoning LMs(熵单调下降、熵-精度指数关系)](https://arxiv.org/abs/2505.22617)
+- [NVIDIA NeMo — DPO/RPO/IPO(β=0.1~0.5、起于 SFT、batch 甜点)](https://docs.nvidia.com/nemo-framework/user-guide/24.12/modelalignment/dpo.html)
+- [Amazon SageMaker / Nova — DPO(β 区间、最少 1000 对、rewards margin 监控)](https://docs.aws.amazon.com/sagemaker/latest/dg/nova-dpo.html)
+- [OpenAI Cookbook — SFT vs DPO vs RFT 选择指南(数据量、过拟合)](https://cookbook.openai.com/examples/fine_tuning_direct_preference_optimization_guide)
+- [BramVanroy — DPO 超参搜索(lr 1e-7/5e-7、β 网格、β=0.5 偏高)](https://huggingface.co/posts/BramVanroy/492522322273746)
+- [Predibase — RL 在小数据下胜过 SFT](https://predibase.com/blog/how-reinforcement-learning-beats-supervised-fine-tuning-when-data-is-scarce)
+- [Lilian Weng — Reward Hacking in RL(proxy-gold gap、检测信号)](https://lilianweng.github.io/posts/2024-11-28-reward-hacking/)
+- [KL Penalties Don't Stop Reward Hacking(局部低概率作弊、切片监控)](https://medium.com/@duckweave/kl-penalties-dont-stop-reward-hacking-0f527abdded4)
+- [InfoRM:信息瓶颈 reward modeling 抑制过优化(latent 离群点/CSI)](https://arxiv.org/abs/2402.09345)
+- [Iterative DPO(分布漂移、在线重标注、Pre-DPO guiding reference)](https://www.emergentmind.com/topics/iterative-direct-preference-optimization-dpo)
 
 ---
 

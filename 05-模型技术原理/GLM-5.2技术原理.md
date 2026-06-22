@@ -1,7 +1,9 @@
 # GLM-5.2 技术原理详解
 
-> 发布方：智谱 AI（Z.ai）。GLM-5.2 于 2026-06-13 面向 GLM Coding Plan 全量用户开放，2026-06-17 正式开源（MIT 协议，权重上线 Hugging Face `zai-org/GLM-5.2` 与 ModelScope）。定位"长程任务（long-horizon）"与 Agentic Coding/Engineering 旗舰基座。
+> 发布方：智谱 AI（Z.ai）。GLM-5.2 于 2026-06-13 面向 GLM Coding Plan 全量用户开放，2026-06-16/17 正式开源（MIT 协议，权重上线 Hugging Face `zai-org/GLM-5.2`、FP8 版 `zai-org/GLM-5.2-FP8` 与 ModelScope）。定位"长程任务（long-horizon）"与 Agentic Coding/Engineering 旗舰基座。
 > 本文重点讲**技术原理（机制怎么做的）**，而非罗列特性。核心三块：**IndexShare 跨层共享索引器**、**MTP 投机解码的训练-推理一致性改造**、**面向 Agent 的百万上下文工程**；外加配套的 **ZCode 3.0 自研 Agent 内核**。
+>
+> ⚠️ 关于一手文献的说明（已核实）：GLM 系列存在两篇可引用的 arXiv 论文——**GLM-5 技术报告 [arXiv:2602.15763]**（《GLM-5: from Vibe Coding to Agentic Engineering》，2026-02-17 提交，Z.ai & 清华，奠定 ARC 能力 + DSA + 异步 RL 基础设施）与 **IndexShare 论文 [arXiv:2603.12201]**（GLM-5.2 模型卡引用，讲跨层共享索引器与投机解码改造）。GLM-5.2 模型卡同时引用这两篇。因此"GLM-5.2 无完整一手材料"的说法不准确：核心架构机制（IndexShare、MTP 消融）有 arXiv + 官方 HF 博客背书，**但多数对外宣称的基准分数（SWE-bench Pro / FrontierSWE / AIME / GPQA 等）仍为厂商自报，独立复核（如 Epoch AI）截至本文撰写仍 pending**。
 
 ---
 
@@ -17,7 +19,9 @@ GLM-5.2 相对 GLM-5.1 的最大跃迁，是把上下文从约 200K 提升到**�
 | 能力 vs. 速度/成本不可兼得 | **多档推理投入度(High/Max thinking effort)** | 用户自选档位 |
 | 第三方 Agent 内核为 Claude 优化,跑 GLM 不对路 | **ZCode 3.0 自研 Agent 内核** | 推理链路/工具协议/错误恢复原生适配 GLM |
 
-**关键参数**：MoE 架构，总参数约 **744B–753B**（不同来源有出入，HF safetensors 元数据约 753.33B），每 token 激活约 **40B**；模型卡标签含 `glm_moe_dsa`；训练数据截止 2025-11；当前仅文本/代码模态，**无多模态**。架构延续 GLM-5 系列的 **MoE + DSA（DeepSeek 式稀疏注意力）** 路线，5.2 的全部新意都加在这条路线之上。
+**关键参数**：MoE 架构，总参数约 **743B–753B**（不同来源/精度元数据有出入：vLLM/SGLang recipes 记 ~743B，部分资讯与 HF safetensors 元数据约 753.33B，本地部署解读多用 744B 整数），每 token 激活约 **39B–40B**；模型卡标签含 `glm_moe_dsa`；上下文 **1M（1,048,576）tokens**、最大输出 **128K（131,072）tokens**；训练数据截止 2025-11；当前仅文本/代码模态，**无多模态**。架构延续 GLM-5 系列的 **MoE + DSA（DeepSeek Sparse Attention，DeepSeek 式稀疏注意力）** 路线，5.2 的全部新意都加在这条路线之上。
+
+> 为什么参数量会"对不齐"：MoE + 多档量化导致不同来源各报各的——BF16 全精度权重约 1.51TB，社区量化（如 Dynamic 2.0）可压到 ~239GB 并保留约 82% 精度；safetensors 元数据按张量逐一累加（含 MTP 层、indexer 等）得到 753.33B，而 recipe 文档常报"主干"口径 ~743B。**数量级一致（约 0.74T 总参 / 0.04T 激活），差异来自统计口径而非矛盾。**
 
 > 一句话定位：GLM-5.2 不是"换了个更大的模型"，而是**用一组系统级技巧，把百万上下文从"天价"变成"工程上跑得起"**，并配自研 Agent 内核形成"开源模型 + 自研 Agent"的垂直整合。
 
@@ -47,6 +51,8 @@ GLM-5.2 的解法叫 **IndexShare**,原理一句话:
 - **省掉 3/4 的 indexer 点积与 top-k 计算**(4 层里只算 1 次);
 - 在 **1M 上下文长度下,每个 token 的 FLOPs 降低 2.9×**;
 - IndexShare 从 **mid-training(中期训练)阶段就启用**,并从 128K 序列长度开始基于 IndexShare 训练——也就是说它不是事后推理 trick,而是训练时就让模型适应"共享索引"这件事,因此**在更少计算量下反而超过了 GLM-5.1 的长上下文表现**。
+
+> 一手出处（已核实）：官方 HF 博客原文为 "every 4 transformer layers share a lightweight indexer. The indexer is placed at the first of 4 layers and topk indices are used for 4 layers. This reduces the computation of indexer dot product and topk operation in 3/4 layers"，与本节描述一致；该机制对应 **IndexShare 论文 [arXiv:2603.12201]**。本质是把 DSA 的稀疏选择从"逐层独立"改成"每 4 层一组、组内共享 top-k"，是一种**层间冗余压缩**——用相邻层注意力模式的高相关性，换取 3/4 indexer 计算的省略。
 
 ### 1.3 为什么"复用索引"在质量上站得住
 
@@ -106,14 +112,18 @@ GLM-5.2 还借鉴了近期研究:
 - 为投机解码引入 **rejection sampling(拒绝采样)**;
 - 训练用 **端到端 TV(total variation)loss**。
 
+> 理论根据（已核实，新增来源）：rejection sampling + 端到端 TV loss 借鉴自 **《Breaking Entropy Bounds: Accelerating RL Training via MTP with Rejection Sampling》[arXiv:2606.12370]**（即 "Bebop" 论文）。它的核心论点有两条：(1) **MTP 接受率受目标模型熵的根本约束**，二者在多种任务/模型上呈清晰的负线性关系——熵越高、草稿越难被接受；(2) **拒绝采样的接受率取决于"策略-草稿分布重叠度"，对熵漂移不敏感**，因此能突破上述熵上界。而普通 CE/KL 训练出的 MTP 在拒绝采样下并非最优——接受率此时由两分布间的 **Total Variation 距离**决定，所以直接用**端到端 TV loss** 去优化"多步拒绝采样接受率"才对路。这解释了消融表里最后一行（+TV Loss → 5.47）为何能再抬一截。
+
 在 coding 场景、MTP 步数设为 7 的消融实验中,四步累积效果清晰:
 
 | 配置 | 接受长度 |
 |------|----------|
 | baseline | 4.56 |
-| + IndexShare + KVShare | 5.10 |
+| + IndexShare + KV Share | 5.10 |
 | + Rejection Sampling | 5.29 |
 | + 端到端 TV Loss | **5.47(+20%)** |
+
+> 表中数字与官方 HF 博客消融表逐项一致（已核实）。"KV Share" 是官方与 IndexShare 并列列出的术语，指**第 2 节所述"复用第一步 KV-cache"的机制**——它和 IndexShare（复用 top-k 索引）是同一招的两面，故官方把二者写在同一消融行。
 
 最终结论:**最终 MTP 层的接受长度相比 baseline 提升约 20%**。考虑到 5.2 把窗口拉到 1M、coding 负载会大幅偏向长 prompt,这个加速尤其值钱。
 
@@ -132,6 +142,16 @@ GLM-5.2 还借鉴了近期研究:
 
 为此 GLM-5.2 **大幅扩充了面向 Agent 场景的百万 token 训练数据**——让模型在贴近真实多步任务的超长轨迹上训练,把"窗口长度"转化为"长程交付能力"。验证结果:在三项长程基准上 **GLM-5.2 均为开源模型第一**,Terminal-Bench 2.1 仅落后 Claude Opus 4.8 数个百分点、超越 Gemini 3.1 Pro。
 
+**三项长程基准具体名称与数字(已核实，厂商自报，待独立复核):**
+
+| 长程基准 | 任务尺度 | GLM-5.2 | 对照 | 结论 |
+|----------|----------|---------|------|------|
+| **FrontierSWE**（Proximal 评测，1M 上下文 / Max effort / 128K 输出） | 数小时~数十小时的开放式技术项目（系统优化、大规模构建、应用 ML 研究） | **74.4** | Opus 4.8 75.1 / GPT-5.5 72.6 | 险胜 GPT-5.5，距 Opus 4.8 仅约 0.7 分 |
+| **PostTrainBench**（每个 agent 配 1×H100，看能把小模型后训练提升多少） | 端到端后训练流水线 | **34.3** | GPT-5.5 25.0（且超 Opus 4.7） | 仅次于 Opus 4.8，第 2 |
+| **SWE-Marathon**（超长程：造编译器、调 kernel、做生产级服务） | 极长程软件工程 | **13.0** | Opus 4.8 26.0 | 仅次于 Opus 系列，但**差距最大（约一半）** |
+
+> 怎么读这三项：**FrontierSWE 几乎追平 Opus**，说明在"数小时级"任务上 GLM-5.2 已是第一梯队；但 **SWE-Marathon 仅及 Opus 一半**，说明"超长程（造编译器这类几十小时连续工程）"上仍有结构性差距——分析普遍认为这来自 Opus 的训练 + Claude Code 基础设施在超长任务上的积累，是**结构性而非偶然**的差距。诚实结论：GLM-5.2 是"开源长程第一 + 主流编码与 Opus 同档，但越长越吃力"。
+
 > 这一点呼应了 GLM 系列一贯的工程立场:**真正能用的长上下文 = 便宜的注意力机制(IndexShare)+ 贴合真实 Agent 轨迹的训练数据**,两者缺一不可。
 
 ---
@@ -142,6 +162,8 @@ GLM-5.2 引入**多档推理投入度控制**,让用户在"模型能力"与"执�
 
 - **Max**:复杂、多步、需要跨长序列规划与反复修订的编码任务;
 - **High**:更快的日常使用。
+
+> 档位的实际代价（已核实）：官方/评测口径下，**Max 档每任务约耗 85K 输出 token** 冲峰值智能；切到 **High 档只损失几分性能，却把输出 token 量大致砍半**。这把"思考多深"量化成了"花多少 token"——不是玄学旋钮，而是性能/成本的可测权衡。Artificial Analysis 也据此提示：GLM-5.2 在其评测 harness 里**约 43K 输出 token/任务**（对比 MiniMax-M3 ~24K、Kimi K2.6 ~35K），强智能分数是以**较高 token 消耗**换来的——选档时需把这点计入成本。
 
 本质是把"思考多深"做成可调旋钮,匹配文档第 5 节(上下文工程)里"为不同任务找最小高信号 token 集"的同一思路。
 
@@ -165,15 +187,21 @@ GLM-5.2 引入**多档推理投入度控制**,让用户在"模型能力"与"执�
 
 | 基准 | GLM-5.1 → GLM-5.2 | 说明 |
 |------|-------------------|------|
-| SWE-Bench Pro | 58.4 → **62.1** | 开源 SOTA |
-| Terminal-Bench 2.1（Terminus-2） | 63.5 → **81.0** | 仅落后 Opus 4.8 数个百分点 |
-| AIME 2026 | 95.3 → **99.2** | 数学推理 |
-| Code Arena（前端盲测） | — | 全球可用模型**第一** |
-| Artificial Analysis Intelligence Index | — | **51**,开源模型最高 |
+| SWE-Bench Pro | 58.4 → **62.1** | 开源 SOTA；胜 GPT-5.5(58.6)，但**仍落后 Opus 4.8(69.2)约 7 分** |
+| Terminal-Bench 2.1（Terminus-2） | 63.5 → **81.0** | 落后 Opus 4.8(85.0)/GPT-5.5(84.0)数分，超 Gemini 3.1 Pro(74.0) |
+| AIME 2026 | 95.3 → **99.2** | 数学推理（厂商自报） |
+| GPQA-Diamond | — → **91.2** | 厂商自报 |
+| MCP-Atlas（工具调用） | — → **77.0** | 胜 GPT-5.5(75.3)，略低于 Opus 4.8(77.8) |
+| Code Arena（前端 WebDev 盲测） | — | **第 2**（榜首为 Claude Fable 5）——开源最强前端 |
+| Artificial Analysis Intelligence Index v4.1 | — | **51**，**开源模型最高**，但落后 Opus 4.8(56)/GPT-5.5 xhigh(55) |
+
+> ⚠️ 已修正原文："Code Arena 全球可用模型第一"与可核实来源不符——多家评测显示其在 **Code Arena WebDev 榜为第 2**（Claude Fable 5 居首），应理解为"**开源前端最强**"而非"全球第一"。同理 AA Index 的 51 是"**开源第一**"，整体仍在 Opus 4.8 / GPT-5.5 之下。这些数字**多为厂商自报**，Epoch AI 等独立复核 pending。
 
 社区反响罕见地正面:有评测者认为其在自身用例上"至少与 Opus 4.8、GPT-5.5 相当",主要短板是**缺视觉能力**。
 
-**定价(API,每 1M tokens):** 输入 **$1.40**、缓存输入 **$0.26**、输出 **$4.40**——约为同档前沿模型的 **1/6**。订阅侧覆盖 GLM Coding Plan 全部档位(Lite/Pro/Max/团队版)。
+**定价(API,每 1M tokens):** 输入 **$1.40**、缓存输入 **$0.26**、输出 **$4.40**——约为同档前沿模型的 **1/6**。订阅侧覆盖 GLM Coding Plan 全部档位(Lite/Pro/Max/团队版)，企业订阅起步约 **$12.60/月**。
+
+> 价差量化（已核实）：对照 Claude Opus 4.8 的 **$5/$25**（输入/输出，每 1M tokens），GLM-5.2 约 **输入便宜 3.6×、输出便宜 5.7×**；叠加长程编码任务的整体成本，VentureBeat 等给出"约 1/6 成本"的口径。分析普遍结论：**要 agentic SWE 天花板选 Opus 4.8；当成本、自托管或开源权重更重要时选 GLM-5.2。**
 
 **开源:** **MIT 协议**,无地域限制,允许商用、私有化部署、微调、二次开发再商业化,仅需保留版权声明。
 
@@ -183,7 +211,9 @@ GLM-5.2 引入**多档推理投入度控制**,让用户在"模型能力"与"执�
 
 - **无多模态**:当前仅文本/代码,缺视觉(社区公认的主要短板)。
 - **1M ≠ 无限可靠记忆**:百万上下文能显著减少大型项目分析中的"上下文断裂",但**超长任务仍需明确的工程约束、阶段性校验、工具调用记录**(呼应 harness 指南里"长任务靠持久产物而非纯靠上下文"的结论)。
-- **基准多为自报**:发布时未出完整技术报告,部分结构性说明属"厂商确认但未经独立验证",最详尽的技术细节来自 Z.ai 官方 HF 博客。
+- **超长程仍有结构性差距**:SWE-Marathon 上仅约为 Opus 4.8 的一半（13.0 vs 26.0），"几十小时连续工程"是当前主要弱项。
+- **token 效率偏高**:Artificial Analysis 评测中约 43K 输出 token/任务（高于 MiniMax-M3/Kimi K2.6），强分数有 token 成本代价。
+- **基准多为自报**:核心**架构机制**有 arXiv（GLM-5 报告 [2602.15763]、IndexShare [2603.12201]）+ 官方 HF 博客背书；但多数**对外基准分数**（SWE-bench Pro / FrontierSWE / AIME / GPQA 等）属"厂商确认但未经独立验证"，**Epoch AI 等中立复核 pending**。最详尽的训练-推理一致性细节来自 Z.ai 官方 HF 博客与 IndexShare 论文。
 
 ---
 
@@ -205,7 +235,12 @@ GLM-5.2 引入**多档推理投入度控制**,让用户在"模型能力"与"执�
 
 **官方/一手:**
 - [GLM-5.2: Built for Long-Horizon Tasks(Z.ai 官方 HF 博客)](https://huggingface.co/blog/zai-org/glm-52-blog)
+- [zai-org/GLM-5.2 模型卡(Hugging Face)](https://huggingface.co/zai-org/GLM-5.2)
+- [GLM-5: from Vibe Coding to Agentic Engineering(GLM-5 技术报告, arXiv:2602.15763)](https://arxiv.org/abs/2602.15763)
+- [IndexShare 论文(GLM-5.2 模型卡引用, arXiv:2603.12201)](https://arxiv.org/abs/2603.12201)
+- [Breaking Entropy Bounds: Accelerating RL Training via MTP with Rejection Sampling("Bebop", arXiv:2606.12370)](https://arxiv.org/abs/2606.12370)
 - [GLM-5.2 — 智谱AI开放文档](https://docs.bigmodel.cn/cn/guide/models/text/glm-5.2)
+- [GLM-5.2 — Z.AI Developer Document](https://docs.z.ai/guides/llm/glm-5.2)
 - [zai-org/GLM-5.2 | vLLM Recipes](https://recipes.vllm.ai/zai-org/GLM-5.2)
 - [GLM-5.2 — SGLang Documentation](https://docs.sglang.io/cookbook/autoregressive/GLM/GLM-5.2)
 
@@ -217,6 +252,8 @@ GLM-5.2 引入**多档推理投入度控制**,让用户在"模型能力"与"执�
 
 **评测/资讯:**
 - [Z.ai's GLM-5.2 beats GPT-5.5 on long-horizon coding for 1/6th the cost(VentureBeat)](https://venturebeat.com/technology/z-ais-open-weights-glm-5-2-beats-gpt-5-5-on-multiple-long-horizon-coding-benchmarks-for-1-6th-the-cost)
+- [Zhipu AI's GLM-5.2 closes in on closed-source leaders in coding marathons(The Decoder)](https://the-decoder.com/zhipu-ais-glm-5-2-closes-in-on-closed-source-leaders-in-coding-marathons/)
+- [GLM-5.2 Tops the Artificial Analysis Intelligence Index for Open-Weights(TechJack)](https://techjacksolutions.com/ai-brief/glm-52-tops-the-artificial-analysis-intelligence-index-for-o/)
 - [What Is GLM-5.2?(Verdent Guides)](https://www.verdent.ai/guides/what-is-glm-5-2)
 - [GLM-5.2:评测、参数、下载与模型卡(DataLearnerAI)](https://www.datalearner.com/ai-models/pretrained-models/glm-5-2)
 
