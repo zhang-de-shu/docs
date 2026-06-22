@@ -1,0 +1,7 @@
+# 依赖二选一(两份骨架共用大部分代码,只装你要跑的那个 provider)
+
+# Anthropic 版
+anthropic>=0.40.0
+
+# OpenAI 版(兼容国产模型的 OpenAI 协议端点)
+openai>=1.50.0

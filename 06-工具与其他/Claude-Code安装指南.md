@@ -420,6 +420,64 @@ Hooks 允许你在特定事件发生时自动执行 Shell 命令。在 `settings
 
 ---
 
+## 状态栏（Statusline）
+
+默认 Claude Code 底部不显示状态信息。安装 **CCometixLine** 后，底部会出现一行状态栏，显示当前模型、上下文窗口占用、累计费用、Token 用量、Git 分支等信息。
+
+### 安装
+
+通过 npm 全局安装（包名 `@cometix/ccline`）：
+
+```bash
+npm install -g @cometix/ccline
+```
+
+验证安装并查看二进制路径：
+
+```bash
+ccline --version
+which ccline    # 记下这个路径，下一步要用
+```
+
+> 注意：如果你用 nvm 管理 Node.js，`ccline` 会装在当前 node 版本目录下（如 `~/.nvm/versions/node/v22.22.0/bin/ccline`）。切换 node 版本后该路径会失效，建议在配置里使用 `which ccline` 输出的绝对路径。
+
+### 配置 settings.json
+
+在 `~/.claude/settings.json` 中加入 `statusLine` 配置（command 填上一步的绝对路径）：
+
+```json
+{
+  "statusLine": {
+    "type": "command",
+    "command": "/Users/你的用户名/.nvm/versions/node/v22.22.0/bin/ccline",
+    "padding": 0
+  }
+}
+```
+
+保存后重启 Claude Code，底部即可看到状态栏。
+
+### 状态栏字段说明
+
+| 显示 | 含义 |
+|------|------|
+| `Opus 4.6` | 当前模型 |
+| `[▓▓▓░░░] 54%` | 上下文窗口已用比例 |
+| `$1.23` | 当前会话累计费用 |
+| `↑540.1K ↓825` | 输入 / 输出 Token 数 |
+| `↘539.6K ↗496` | 缓存读 / 写 Token |
+| `feature/xxx` | 当前 Git 分支 |
+
+### 自定义样式
+
+CCometixLine 自带交互式配置界面，可增删字段、改主题：
+
+```bash
+ccline --config    # 打开 TUI 配置界面
+```
+
+---
+
 ## IDE 集成
 
 ### VS Code
