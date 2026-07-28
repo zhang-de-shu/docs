@@ -84,6 +84,11 @@ SFT 用 **(输入, 期望输出)** 对,通过标准的下一个 token 交叉熵,
   - **Krippendorff's α**:**多标注员、有缺失数据、或序数/区间量表**时用它,更通用。判读:**α ≥ 0.8 为很好**,**α ≥ 0.667 只能下试探性结论**;生产数据目标 **≥ 0.7**。
   - ⚠️ **别只看"简单一致率(percent agreement)"**:它不扣除"碰巧一致",在标签稀疏时会虚高。
   - ⚠️ Krippendorff's α **必须正确指定数据类型与距离**:rubric 的 Likert 打分是**序数(ordinal)**,别当 nominal 算,否则 α 会被严重高估或低估。
+- **这些指标到底怎么算**(都是同一思路:`一致性 = 1 − 实际分歧 / 随机分歧`,即扣掉"碰巧一致"):
+  - **Cohen's κ** = `(Pₒ − Pₑ) / (1 − Pₑ)`。`Pₒ` = 两人实际标相同的比例(混淆矩阵对角线占比);`Pₑ` = 各人独立随机时碰巧一致的概率(各类别边际概率乘积之和)。直觉:`Pₒ=0.85` 看着高,但若 `Pₑ=0.5`,扣完只剩 κ=0.70。
+  - **序数打分(Likert 1–5)用 Quadratic Weighted Kappa**,别用普通 κ:给混淆矩阵套距离权重 `wᵢⱼ=(i−j)²/(N−1)²`,「差 1 分」和「差 4 分」惩罚不同。普通 κ 把两者当同等错误,会把合格数据误判为不合格(实测同一份打分:QWK 0.90 vs 普通 κ 0.50)。
+  - **Krippendorff's α** = `1 − Dₒ/Dₑ`,`Dₒ`=所有标注对的实际加权分歧,`Dₑ`=随机配对的期望分歧;**距离函数 δ 由数据类型决定**——nominal 是 0/1,ordinal 按秩次间隔、interval 用差值平方。传错类型 α 会大幅偏移(实测同数据:ordinal 0.90 vs 误传 nominal 0.58)。
+  - **代码**:κ 与 QWK 直接用 `sklearn.metrics.cohen_kappa_score(a, b)` /  加 `weights='quadratic'`;α 用 `pip install krippendorff` 后 `krippendorff.alpha(reliability_data=..., level_of_measurement='ordinal')`。两者都不必手写。
 - **阈值即动作(go/no-go)**:**α/κ 跌破 0.7–0.8 → 停止扩量,回去改指南 + 重新校准**,而不是堆人去事后纠。
 
 **第二条线:自由生成的 response——用 rubric + 范例 + 分层评审控风格**
@@ -382,6 +387,16 @@ SFT 的精髓:**用高质量、多样、格式一致的数据,只监督模型该
 - [Knowledge Injection: Fine-Tuning vs RAG(Zilliz)](https://zilliz.com/blog/knowledge-injection-in-llms-fine-tuning-and-rag)
 - [To tune or not to tune — RAG vs Fine-tuning(Google Cloud)](https://cloud.google.com/blog/products/ai-machine-learning/to-tune-or-not-to-tune-a-guide-to-leveraging-your-data-with-llms)
 - [RAG vs Fine-tuning: Enterprise Decisions(Databricks)](https://www.databricks.com/blog/rag-vs-fine-tuning)
+
+**标注一致性 / 数据质量管理:**
+- [Data Labeling for LLMs: Annotation Methods, Quality & Governance(Atlan)](https://atlan.com/know/data-labeling-best-practices-llms/)
+- [Data quality and rubrics: how to build trust in your models(Snorkel AI)](https://snorkel.ai/blog/data-quality-and-rubrics-how-to-build-trust-in-your-models/)
+- [Annotation QA: 2026 Strategies for Better Model Accuracy(Label Your Data)](https://labelyourdata.com/articles/data-annotation/quality-assurance)
+- [Data Annotation for LLM Fine-Tuning: RLHF and Instruction Tuning Guide(Second Talent)](https://www.secondtalent.com/resources/data-annotation-for-llm-fine-tuning-rlhf-and-instruction-tuning-guide/)
+- [How to Write Style Guides for Data Annotation Projects(SuperAnnotate)](https://www.superannotate.com/blog/how-to-write-data-annotation-style-guide)
+- [Krippendorff's Alpha for Annotation Agreement(Label Studio)](https://labelstud.io/blog/how-to-use-krippendorff-s-alpha-to-measure-annotation-agreement/)
+- [Counting on Consensus: Selecting the Right IAA Metric for NLP(arXiv)](https://arxiv.org/html/2603.06865)
+- [Analyzing Dataset Annotation Quality Management in the Wild(MIT Press, Computational Linguistics)](https://direct.mit.edu/coli/article/50/3/817/120233/Analyzing-Dataset-Annotation-Quality-Management-in)
 
 ---
 
