@@ -2,7 +2,7 @@
 
 ## 1. 概述
 
-Agent-Wiki 是一套面向 LLM Agent 的**知识编译与维护框架**，核心思想来自 Andrej Karpathy 提出的 LLM Wiki 模式：**在 ingest 时处理知识，而非在 query 时检索碎片**。
+Agent-Wiki 是一套面向 LLM Agent 的**知识编译与维护框架**，核心思想来自 Andrej Karpathy 提出的 LLM Wiki 模式：**在 ingest（知识导入） 时处理知识，而非在 query 时检索碎片**。
 
 与传统 RAG 的本质区别：
 
