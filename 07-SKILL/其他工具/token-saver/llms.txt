@@ -1,0 +1,50 @@
+# Token Saver Desktop
+
+> Local-first desktop software for diagnosing AI-agent token waste and measuring cost per successful task.
+
+Canonical repository: https://github.com/SiruGao/token-saver
+
+## Current status
+
+Token Saver Desktop V1 is a working read-only analyzer built with Tauri 2 and TypeScript.
+
+V1 includes a Dashboard, Doctor, Sessions, Integrations, Settings, transcript import, local agent detection, read-only session scanning, usage normalization, token estimation, local report export, and six deterministic waste rules.
+
+Supported detection targets include Claude Code, OpenAI Codex, OpenClaw, Hermes Agent, OpenCode, and Cursor.
+
+The OpenClaw SKILL.md remains an optional integration and is not the product core.
+
+V1 does not yet modify prompts, apply automatic compression, claim verified savings, or provide signed public installers.
+
+## Product direction
+
+- V1: Desktop Analyzer and Doctor.
+- V1.1: agent-specific parsers and SQLite Proof Ledger.
+- V1.2: exact deduplication, cache alignment, and reversible compaction.
+- V2: local Gateway, Quality Guard, replay, provider reconciliation, and verified cost-per-success reporting.
+
+Primary metric: cost per successful task.
+
+## Important documents
+
+- README: https://github.com/SiruGao/token-saver/blob/main/README.md
+- Desktop V1: https://github.com/SiruGao/token-saver/blob/main/docs/V1.md
+- Roadmap: https://github.com/SiruGao/token-saver/blob/main/ROADMAP.md
+- Architecture: https://github.com/SiruGao/token-saver/blob/main/docs/ARCHITECTURE.md
+- Benchmark policy: https://github.com/SiruGao/token-saver/blob/main/docs/BENCHMARKS.md
+- OpenClaw integration: https://github.com/SiruGao/token-saver/blob/main/SKILL.md
+- Contributing: https://github.com/SiruGao/token-saver/blob/main/CONTRIBUTING.md
+
+## Core principles
+
+- Measure before optimizing.
+- Prefer exact elimination, caching, delta context, and retrieval over lossy summaries.
+- Use provider-reported usage as billing truth.
+- Include retries and rework in cost calculations.
+- Keep processing local by default.
+- Keep V1 read-only.
+- Publish reproducible evidence for headline claims.
+
+## Search concepts
+
+AI agent desktop app, AI agent token optimization, LLM cost optimization, context engineering, prompt caching, token usage dashboard, AI FinOps, token observability, MCP optimization, local-first AI, provider usage reconciliation, cost per successful task.

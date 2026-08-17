@@ -1,0 +1,5 @@
+interface:
+  display_name: "拷问我"
+  short_description: "通过连环追问打磨你的计划"
+policy:
+  allow_implicit_invocation: false

@@ -1,0 +1,74 @@
+name: Release signed desktop updates
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - package.json
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - id: version
+        name: Resolve release version
+        shell: bash
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          if git ls-remote --exit-code --tags origin "refs/tags/v$VERSION" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: dtolnay/rust-toolchain@stable
+        if: steps.version.outputs.exists != 'true'
+        with:
+          targets: aarch64-apple-darwin
+      - uses: swatinem/rust-cache@v2
+        if: steps.version.outputs.exists != 'true'
+        with:
+          workspaces: src-tauri
+      - run: npm install
+        if: steps.version.outputs.exists != 'true'
+      - run: npm run check
+        if: steps.version.outputs.exists != 'true'
+      - name: Prepare signed updater configuration
+        if: steps.version.outputs.exists != 'true'
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          TOKEN_SAVER_UPDATER_PUBLIC_KEY: ${{ secrets.TOKEN_SAVER_UPDATER_PUBLIC_KEY }}
+        run: npm run release:config
+      - uses: tauri-apps/tauri-action@v0
+        if: steps.version.outputs.exists != 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          TOKEN_SAVER_UPDATER_PUBLIC_KEY: ${{ secrets.TOKEN_SAVER_UPDATER_PUBLIC_KEY }}
+          APPLE_SIGNING_IDENTITY: "-"
+          RUST_BACKTRACE: "1"
+        with:
+          tagName: v${{ steps.version.outputs.version }}
+          releaseName: Token Saver v${{ steps.version.outputs.version }}
+          releaseCommitish: ${{ github.sha }}
+          releaseBody: Ad-hoc signed Token Saver macOS release. Later signed builds can update from inside Settings.
+          releaseDraft: false
+          prerelease: false
+          generateReleaseNotes: true
+          uploadUpdaterJson: true
+          uploadUpdaterSignatures: true
+          retryAttempts: 2
+          args: --target aarch64-apple-darwin --config src-tauri/tauri.release.conf.json

@@ -1,0 +1,7 @@
+# video-gen skill 依赖
+requests
+opencv-python>=4.8
+moviepy>=2.0
+Pillow>=9.5
+rembg
+numpy==1.26.4
