@@ -1,8 +1,25 @@
 {
   "providers": {
-    "anthropic": {
-      "baseUrl": "https://zenmux.ai/api/anthropic",  // https://zenmux.ai/api/anthropic
-      "apiKey": "sk-ai-v1-bf4bfd0a73a49dd3e3f3ebebf95d6c2e99082ea070c7a3cc4e60af78fff8402d"
+    "deepseek":{
+      "baseUrl": "https://api.deepseek.com/anthropic",
+      "apiKey": "sk-2171832cf8674a839b06e5f89b018146",
+      "compat": { "allowEmptySignature": true },
+      "models": [
+        {
+          "id": "deepseek-v4-flash",
+          "reasoning": true,
+          "input": ["text"],
+          "contextWindow": 1000000,
+          "maxTokens": 384000
+        },
+        {
+          "id": "deepseek-v4-pro",
+          "reasoning": true,
+          "input": ["text"],
+          "contextWindow": 1000000,
+          "maxTokens": 384000
+        }
+      ]
     },
     "zenmux": {
       "baseUrl": "https://zenmux.ai/api/anthropic",
@@ -20,13 +37,6 @@
         },
         {
           "id": "deepseek/deepseek-v4-flash",
-          "reasoning": true,
-          "input": ["text"],
-          "contextWindow": 1000000,
-          "maxTokens": 384000
-        },
-        {
-          "id": "deepseek/deepseek-v4-flash-free",
           "reasoning": true,
           "input": ["text"],
           "contextWindow": 1000000,
@@ -72,6 +82,10 @@
           "maxTokens": 64000
         }
       ]
+    },
+    "anthropic": {
+      "baseUrl": "https://zenmux.ai/api/anthropic",  // http://47.108.176.183:9000
+      "apiKey": "sk-ai-v1-bf4bfd0a73a49dd3e3f3ebebf95d6c2e99082ea070c7a3cc4e60af78fff8402d"
     }
   }
 }
