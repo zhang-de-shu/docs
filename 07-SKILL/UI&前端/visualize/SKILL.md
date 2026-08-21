@@ -1,13 +1,13 @@
 ---
 name: visualize
 description: >
-  Create beautiful, self-contained HTML visualizations from any content or idea.
-  Use for: slide decks, presentations, infographics, dashboards, flowcharts, diagrams,
-  timelines, comparison tables, data visualizations, landing pages, one-pagers, org charts,
-  mind maps, process flows, kanban boards, report summaries, or any visual that helps
-  humans digest information faster. Trigger on requests like "visualize this," "make a deck,"
-  "create a slide," "build an infographic," "show me a dashboard," "make this visual,"
-  or any request to present information in a visual HTML format.
+  从任何内容或创意创建精美、自包含的 HTML 可视化。
+  适用于：幻灯片、演示文稿、信息图、仪表盘、流程图、示意图、
+  时间线、对比表、数据可视化、落地页、单页摘要、组织结构图、
+  思维导图、流程、看板、报告摘要，或任何能帮助人们更快
+  消化信息的可视化内容。触发请求如 "visualize this"、"make a deck"、
+  "create a slide"、"build an infographic"、"show me a dashboard"、"make this visual"，
+  或任何以可视化 HTML 形式呈现信息的请求。
 license: MIT
 metadata:
   author: careerhackeralex
@@ -18,38 +18,38 @@ metadata:
 
 # Visualize
 
-Turn any idea, data, or content into a stunning single-file HTML visualization.
+将任何想法、数据或内容转化为精美的单文件 HTML 可视化。
 
-## After Creating a File
+## 创建文件之后
 
-**Always do BOTH of these after writing the HTML file:**
+**写完 HTML 文件后，以下两项务必都做到：**
 
-1. **Auto-open in browser:** Run `open <filename>.html` (macOS) or `xdg-open <filename>.html` (Linux) so the user sees it immediately
-2. **Return the file path as a clickable URL:** Include `file://<absolute-path>` in your response so the user can click to open it
+1. **在浏览器中自动打开：** 运行 `open <filename>.html`（macOS）或 `xdg-open <filename>.html`（Linux），让用户立即看到效果
+2. **以可点击 URL 的形式返回文件路径：** 在回复中包含 `file://<absolute-path>`，让用户可以点击打开
 
-Example response after creation:
+创建后的回复示例：
 ```
 Created your visualization! Opening in browser now...
 📄 file:///Users/you/project/my-dashboard.html
 ```
 
-## Critical Requirements (NON-NEGOTIABLE)
+## 关键要求（不可妥协）
 
-⚠️ **EVALUATION FAILURE GUARANTEED WITHOUT THESE 8 ELEMENTS** ⚠️
+⚠️ **缺少以下 8 项元素，评估必然失败** ⚠️
 
-**EVERY file MUST start from the skeleton template in [references/skeleton.md](references/skeleton.md) — copy the ENTIRE template, then add your content.**
+**每个文件都必须从 [references/skeleton.md](references/skeleton.md) 中的骨架模板开始——复制整个模板，然后添加你的内容。**
 
-1. **CSS Custom Properties:** Exact names required: `--bg, --surface, --surface-hover, --border, --text, --text-secondary, --accent, --accent-secondary, --positive, --negative, --warning` — NO other names (not --bg-primary, not --text-primary). **CRITICAL:** These exact property names are required for evaluation system compatibility.
-2. **Utility Menu System (MANDATORY):** Complete `.viz-menu` element with `.viz-menu-toggle` button, `.viz-menu-dropdown` container, download PNG button (`onclick="downloadImage()"`), print button (`onclick="window.print()"`), and html-to-image CDN script (`<script src="https://cdn.jsdelivr.net/npm/html-to-image@1.11.11/dist/html-to-image.js"></script>`). **EVALUATION CRITICAL:** Menu system is automatically checked and WILL CAUSE FAILURES if missing.
-3. **Theme Classes (EVALUATION CRITICAL):** Must explicitly define BOTH `.theme-light` and `.theme-dark` classes in stylesheet with complete custom property definitions. **EXAMPLE REQUIRED:**
+1. **CSS 自定义属性：** 必须使用确切名称：`--bg, --surface, --surface-hover, --border, --text, --text-secondary, --accent, --accent-secondary, --positive, --negative, --warning` —— 不允许其他名称（不能用 --bg-primary，也不能用 --text-primary）。**关键：** 评估系统兼容性要求使用这些确切的属性名。
+2. **实用菜单系统（强制）：** 完整的 `.viz-menu` 元素，包含 `.viz-menu-toggle` 按钮、`.viz-menu-dropdown` 容器、下载 PNG 按钮（`onclick="downloadImage()"`）、打印按钮（`onclick="window.print()"`），以及 html-to-image CDN 脚本（`<script src="https://cdn.jsdelivr.net/npm/html-to-image@1.11.11/dist/html-to-image.js"></script>`）。**评估关键：** 菜单系统会被自动检查，缺失将导致失败。
+3. **主题类（评估关键）：** 必须在样式表中显式定义 `.theme-light` 和 `.theme-dark` 两个类，并包含完整的自定义属性定义。**必须给出示例：**
 ```css
 :root { /* base properties */ }
 .theme-light { --bg: #ffffff; --surface: #f8f9fa; --text: #1a1a1a; /* etc */ }
 .theme-dark { --bg: #0a0a0a; --surface: #1a1a1a; --text: #ffffff; /* etc */ }
 ```
-**NEVER rely on just `:root` or `@media (prefers-color-scheme)` — evaluation system checks for class-based themes.**
-4. **Semantic HTML:** `<main id="main-content">` element, **MANDATORY: Multiple `<section>` elements for major content blocks** (header, metrics, charts, etc.), skip-to-content link. Each distinct content area must be wrapped in semantic `<section>` tags.
-5. **Chart.js Requirements (EVALUATION CRITICAL):** MUST include `<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>` before closing `</head>`. **MANDATORY:** IMMEDIATELY after Chart.js script, add `<script>Chart.defaults.animation = false;</script>` (prevents animation glitches and is automatically checked by evaluation system). **MANDATORY CHART VALIDATION:** Every chart function MUST start with `if (typeof Chart === 'undefined') { console.error('Chart.js not loaded'); return; }`. **CHART ACCESSIBILITY:** Every canvas element MUST have `role="img"` and descriptive `aria-label` attributes. **CRITICAL CHART CONFIG:** Set `maintainAspectRatio: false`, `responsive: true`, and `plugins: { tooltip: { enabled: true } }` for accessibility. **NEVER disable tooltips** - evaluation system checks for enabled tooltips. **CHART RELIABILITY SYSTEM:** Use dedicated ChartManager pattern for bulletproof integration:
+**绝不要只依赖 `:root` 或 `@media (prefers-color-scheme)` —— 评估系统检查的是基于类的主题。**
+4. **语义化 HTML：** `<main id="main-content">` 元素，**强制：为主要内容区块（页头、指标、图表等）使用多个 `<section>` 元素**，跳转正文链接（skip-to-content）。每个独立的内容区域都必须包裹在语义化的 `<section>` 标签中。
+5. **Chart.js 要求（评估关键）：** 必须在 `</head>` 闭合之前包含 `<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>`。**强制：** 在 Chart.js 脚本之后立即添加 `<script>Chart.defaults.animation = false;</script>`（防止动画故障，且评估系统会自动检查）。**强制图表校验：** 每个图表函数都必须以 `if (typeof Chart === 'undefined') { console.error('Chart.js not loaded'); return; }` 开头。**图表无障碍：** 每个 canvas 元素都必须有 `role="img"` 和描述性的 `aria-label` 属性。**关键图表配置：** 出于无障碍考虑，设置 `maintainAspectRatio: false`、`responsive: true` 和 `plugins: { tooltip: { enabled: true } }`。**绝不要禁用 tooltip** —— 评估系统会检查 tooltip 是否启用。**图表可靠性系统：** 使用专门的 ChartManager 模式实现稳健集成：
 ```javascript
 var ChartManager = {
   charts: new Map(),
@@ -109,17 +109,17 @@ var ChartManager = {
   }
 };
 ```
-Use `ChartManager.safeInit()` instead of raw `new Chart()`. **CRITICAL CHART CONFIG:** Set `maintainAspectRatio: false`, `responsive: true`, and `plugins: { tooltip: { enabled: true } }` for accessibility. **CHART CONTAINER DIMENSIONS:** Container must have explicit `height` >= 300px for charts to render properly. Use theme-aware colors with CSS custom properties, never static hex colors. **NEVER use import/export syntax with Chart.js CDN** — use standard var declarations only.
+使用 `ChartManager.safeInit()` 而不是裸写 `new Chart()`。**关键图表配置：** 出于无障碍考虑，设置 `maintainAspectRatio: false`、`responsive: true` 和 `plugins: { tooltip: { enabled: true } }`。**图表容器尺寸：** 容器必须有显式的 `height` >= 300px，图表才能正常渲染。使用基于 CSS 自定义属性的主题感知颜色，绝不使用静态的十六进制颜色。**Chart.js CDN 方式下绝不使用 import/export 语法** —— 只使用标准的 var 声明。
 
-**CHART.JS TROUBLESHOOTING (CRITICAL):** If charts appear as blank white spaces:
-- Verify Chart.js CDN is included before `</head>`
-- Verify `Chart.defaults.animation = false;` is immediately after CDN
-- Verify chart initialization is in DOMContentLoaded event listener
-- Verify no module import/export syntax anywhere in the file
-- Verify ChartManager.safeInit() pattern is used correctly
-- Verify canvas has `role="img"` and `aria-label` attributes
+**Chart.js 故障排查（关键）：** 如果图表显示为空白区域：
+- 确认 Chart.js CDN 包含在 `</head>` 之前
+- 确认 `Chart.defaults.animation = false;` 紧跟在 CDN 之后
+- 确认图表初始化位于 DOMContentLoaded 事件监听器中
+- 确认文件中任何位置都没有模块 import/export 语法
+- 确认正确使用了 ChartManager.safeInit() 模式
+- 确认 canvas 有 `role="img"` 和 `aria-label` 属性
 
-6. **Responsive Design:** Section spacing ≥48px, **CRITICAL: NO horizontal overflow at 375px viewport** (MANDATORY: add `@media (max-width: 375px) { body { overflow-x: hidden; } }` to prevent horizontal scroll), **MANDATORY FONT-SIZE HIERARCHY:** h1 ≥ 2.5rem, h2 ≥ 2rem, h3 ≥ 1.5rem, body = 1rem. **SLIDE DECK REQUIREMENTS:** Title slide h1 ≥ 3rem, content slide titles ≥ 2.5rem, clear visual distinction between heading levels. **SLIDE SECTION SPACING:** Major sections within slides must have ≥48px spacing (title-to-content, content-to-charts, charts-to-navigation). **Test all layouts at 375px width — dashboards especially prone to chart container overflow.** **CSS CONTAINER QUERIES:** For advanced responsiveness, use container-based queries:
+6. **响应式设计：** 区块间距 ≥48px，**关键：375px 视口下不允许水平溢出**（强制：添加 `@media (max-width: 375px) { body { overflow-x: hidden; } }` 以防止水平滚动），**强制字号层级：** h1 ≥ 2.5rem，h2 ≥ 2rem，h3 ≥ 1.5rem，body = 1rem。**幻灯片要求：** 标题页 h1 ≥ 3rem，内容页标题 ≥ 2.5rem，各级标题之间要有清晰的视觉区分。**幻灯片区块间距：** 幻灯片内的主要区块之间必须有 ≥48px 的间距（标题到内容、内容到图表、图表到导航）。**在 375px 宽度下测试所有布局 —— 仪表盘尤其容易出现图表容器溢出。** **CSS 容器查询：** 如需更高级的响应式能力，使用基于容器的查询：
 ```css
 .chart-container { container-type: inline-size; }
 @container (max-width: 400px) { 
@@ -127,43 +127,42 @@ Use `ChartManager.safeInit()` instead of raw `new Chart()`. **CRITICAL CHART CON
   .chart-title { font-size: 1rem; }
 }
 ```
-This provides true component-level responsiveness beyond viewport media queries.
-7. **Print & Accessibility:** `@media print` styles, `@media (prefers-reduced-motion: reduce)` with disabled animations
-8. **Entrance Animations (MANDATORY):** Must include entrance animations via `.animate` classes, `data-reveal` attributes, or CSS `@keyframes`. **EVALUATION CRITICAL:** Animation presence is automatically detected and required.
-9. **JavaScript Functions:** `cycleTheme()`, `toggleMenu()`, top-level variables use `var` not `let`/`const`
+这提供了超越视口媒体查询的真正的组件级响应式能力。
+7. **打印与无障碍：** `@media print` 样式、`@media (prefers-reduced-motion: reduce)` 且禁用动画
+8. **入场动画（强制）：** 必须通过 `.animate` 类、`data-reveal` 属性或 CSS `@keyframes` 包含入场动画。**评估关键：** 动画的存在会被自动检测且是必需项。
+9. **JavaScript 函数：** `cycleTheme()`、`toggleMenu()`，顶层变量使用 `var` 而不是 `let`/`const`
 
-**🔥 CRITICAL: Copy skeleton.md exactly → Replace "YOUR CONTENT HERE" with visualization content → Save file**
+**🔥 关键：原样复制 skeleton.md → 用可视化内容替换 "YOUR CONTENT HERE" → 保存文件**
+## 核心原则
 
-## Core Principles
+1. **单文件 HTML** —— 一个内联 CSS/JS 的 `.html` 文件。在任何浏览器中打开，离线可用，便于通过邮件发送。
+2. **针对浅色主题优化** —— 现代设计优先保证浅色模式的质量。深色主题可通过开关切换。
+3. **默认即美观** —— 首次产出就应看起来专业，无需任何迭代。
+4. **内容优先** —— 可视化服务于信息传达。绝不为美观牺牲清晰度。
+5. **响应式** —— 在桌面、平板和手机上均可用，除非明确采用固定尺寸（如 16:9 幻灯片）。
+6. **视觉克制** —— 专业设计避免增加噪音的装饰性元素。不用悬浮的渐变光球、彩虹边框或装饰性动画。
 
-1. **Single-file HTML** — one `.html` file with inline CSS/JS. Opens in any browser, works offline, emails easily.
-2. **Light theme optimized** — modern designs prioritize light mode quality. Dark theme available via toggle.
-3. **Beautiful by default** — the first output should look professional with zero iteration.
-4. **Content-first** — the visualization serves the message. Never sacrifice clarity for aesthetics.
-5. **Responsive** — works on desktop, tablet, and mobile unless explicitly fixed-dimension (e.g., 16:9 slides).
-6. **Visual restraint** — Professional designs avoid decorative elements that add noise. No floating gradient orbs, rainbow borders, or ornamental animations.
+## 理念
 
-## Philosophy
+HTML 不是"网站"——它是一种可视化工具。代码很廉价。每个人都应该有能力将任何东西可视化。这个 skill 能在几秒内将对话上下文、URL、文章、数据或原始想法转化为直观、易于消化的视觉内容。
 
-HTML is not a "website" — it's a visualization tool. Code is cheap. Everyone should feel empowered to visualize anything. This skill turns conversation context, URLs, articles, data, or raw ideas into something visual and digestible in seconds.
+用户是在与 Codex **对话过程中**调用此 skill 的。要利用完整的对话上下文——他们正在讨论的内容、分享过的任何链接、粘贴过的任何数据——作为素材。给定 URL 时，抓取它并提取内容进行可视化。
 
-Users invoke this **mid-conversation** with Codex. Use the full conversation context — whatever they've been discussing, any links they've shared, any data they've pasted — as source material. When given a URL, crawl it and extract the content to visualize.
+## 输出规则
 
-## Output Rules
+**强制第一步：从 [references/skeleton.md](references/skeleton.md) 复制完整骨架——它包含所有必需元素（菜单、主题系统、CSS 属性、语义化 HTML、无障碍特性）。绝不从零开始写 HTML。**
 
-**MANDATORY FIRST STEP: Copy the complete skeleton from [references/skeleton.md](references/skeleton.md) — this includes all required elements (menu, theme system, CSS properties, semantic HTML, accessibility features). Never write HTML from scratch.**
-
-- Write ONE `.html` file to `~/Downloads/` (or user-specified path)
-- Filename: descriptive kebab-case, e.g., `q4-revenue-dashboard.html`, `team-roadmap-deck.html`
-- Start with skeleton.md template, add your content to the `<!-- YOUR CONTENT HERE -->` section
-- All custom styles in `<style>` after the skeleton's base styles
-- **CDN libraries are encouraged** — use the best tool for the job:
-  - **Tailwind CSS** — `https://cdn.tailwindcss.com` (utility-first styling, use freely)
-  - **Chart.js** — `https://cdn.jsdelivr.net/npm/chart.js` (bar, line, pie, radar, doughnut)
-  - **D3.js** — `https://cdn.jsdelivr.net/npm/d3@7` (complex/custom data viz, force graphs)
-  - **Mermaid** — `https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js` (flowcharts, sequence diagrams)
-  - **Three.js** — 3D when appropriate
-  - **Reveal.js** — full-featured slide engine when needed. **CRITICAL:** Must set `html, body { height: 100%; overflow: hidden; }` and give the `.reveal` container `height: 100%`. Config MUST use numeric dimensions: `Reveal.initialize({ width: 1280, height: 720, center: true, controls: false })` — NEVER use string percentages like `'100%'` which cause zero-height viewport and blank slides. **MANDATORY: Disable Reveal.js default controls** (`controls: false`) — the default `<` `>` arrow overlays are ugly. Instead, add a custom minimal bottom nav bar:
+- 将一个 `.html` 文件写入 `~/Downloads/`（或用户指定的路径）
+- 文件名：描述性的 kebab-case，例如 `q4-revenue-dashboard.html`、`team-roadmap-deck.html`
+- 从 skeleton.md 模板开始，将你的内容添加到 `<!-- YOUR CONTENT HERE -->` 区域
+- 所有自定义样式放在骨架基础样式之后的 `<style>` 中
+- **鼓励使用 CDN 库** —— 为任务选用最佳工具：
+  - **Tailwind CSS** —— `https://cdn.tailwindcss.com`（utility-first 样式，可自由使用）
+  - **Chart.js** —— `https://cdn.jsdelivr.net/npm/chart.js`（柱状图、折线图、饼图、雷达图、环形图）
+  - **D3.js** —— `https://cdn.jsdelivr.net/npm/d3@7`（复杂/自定义数据可视化、力导向图）
+  - **Mermaid** —— `https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js`（流程图、时序图）
+  - **Three.js** —— 适合时使用 3D
+  - **Reveal.js** —— 需要时使用全功能幻灯片引擎。**关键：** 必须设置 `html, body { height: 100%; overflow: hidden; }` 并给 `.reveal` 容器设置 `height: 100%`。配置必须使用数值尺寸：`Reveal.initialize({ width: 1280, height: 720, center: true, controls: false })` —— 绝不使用 `'100%'` 这类字符串百分比，那会导致视口高度为零、幻灯片一片空白。**强制：禁用 Reveal.js 默认控件**（`controls: false`）—— 默认的 `<` `>` 箭头浮层很丑。改为添加自定义的极简底部导航栏：
 ```html
 <nav class="slide-nav" aria-label="Slide navigation">
   <button onclick="prevSlide()" aria-label="Previous slide">
@@ -181,158 +180,157 @@ Users invoke this **mid-conversation** with Codex. Use the full conversation con
 .slide-nav button:hover { opacity: 0.7; }
 .slide-counter { font-size: 12px; color: var(--text-secondary); font-weight: 400; min-width: 40px; text-align: center; opacity: 0.35; }
 ```
-  - **Leaflet** — maps and geospatial data (`https://unpkg.com/leaflet@1.9/dist/leaflet.js` + CSS). **Required for geographic data** — never hand-draw SVG continent shapes. Use OpenStreetMap tiles or a minimal tile provider.
-- SVG for icons and simple graphics — never use external image URLs unless user provides them
-- Prefer CSS animations over JS when possible
+  - **Leaflet** —— 地图和地理空间数据（`https://unpkg.com/leaflet@1.9/dist/leaflet.js` + CSS）。**地理数据必须使用** —— 绝不手绘 SVG 大陆轮廓。使用 OpenStreetMap 瓦片或极简瓦片提供商。
+- 图标和简单图形使用 SVG —— 除非用户提供，否则绝不使用外部图片 URL
+- 尽可能优先使用 CSS 动画而非 JS
 
-See [references/libraries.md](references/libraries.md) for detailed CDN links, patterns, and tips.
+详细 CDN 链接、模式与技巧见 [references/libraries.md](references/libraries.md)。
 
-## Design System
+## 设计系统
 
-Apply these defaults. They are opinionated and tested — override only when user requests it.
+应用以下默认值。它们是有明确主张且经过测试的——仅在用户要求时才覆盖。
 
-**Full design system reference:** See [references/design-system.md](references/design-system.md) for complete typography, color, spacing, animation, accessibility, and visual polish specifications.
+**完整设计系统参考：** 完整的排版、色彩、间距、动画、无障碍和视觉细节规范见 [references/design-system.md](references/design-system.md)。
 
-Key highlights (consult reference for full details):
+关键要点（完整细节请查阅参考文档）：
 
-### Design Notes
+### 设计说明
 
-**Theming System (CRITICAL):**
-- Use **class-based theming ONLY** — `<html class="theme-dark">` or `<html class="theme-light">`
-- Theme toggle changes html class: `document.documentElement.className = 'theme-' + newTheme`
-- **Never use `data-theme` attributes** — the evaluation system expects class-based themes
-- **Required CSS custom properties:** `--bg, --surface, --text, --accent, --border` (minimum set for evaluation compatibility)
+**主题系统（关键）：**
+- **仅**使用基于类的主题 —— `<html class="theme-dark">` 或 `<html class="theme-light">`
+- 主题切换通过更改 html 的类实现：`document.documentElement.className = 'theme-' + newTheme`
+- **绝不使用 `data-theme` 属性** —— 评估系统期望的是基于类的主题
+- **必需的 CSS 自定义属性：** `--bg, --surface, --text, --accent, --border`（评估兼容性的最小集合）
 
-**Typography:**
-- **Inter font mandatory** — `https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap`
-- **MANDATORY font weight hierarchy:** h1 ≥ 700, h2 ≥ 600, h3 ≥ 500, body = 400 (critical evaluation requirement)
-- -0.03em tracking on headings
-- **KOREAN TYPOGRAPHY EXCELLENCE:** For Korean content, use Noto Sans KR for body text with Inter for UI elements. Apply `line-height: 1.6` for Korean (vs 1.4 for Latin). Korean Medium weight maps to Western Regular (400). Include: `https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap`
+**排版：**
+- **必须使用 Inter 字体** —— `https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap`
+- **强制字重层级：** h1 ≥ 700，h2 ≥ 600，h3 ≥ 500，body = 400（关键评估要求）
+- 标题使用 -0.03em 字距（tracking）
+- **韩文排版精益求精：** 对于韩文内容，正文使用 Noto Sans KR，UI 元素使用 Inter。韩文应用 `line-height: 1.6`（拉丁文为 1.4）。韩文的 Medium 字重对应西文的 Regular（400）。包含：`https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap`
 
-**Colors:**
-- Class-based theming only (NO @media prefers-color-scheme)
-- Dark: #0A0A0A bg, #EDEDED text. Light: #FAFAF9 bg, #0f172a text
-- See reference for full palette.
-- **Cards:** 8px radius, shadow-only hover (no translateY/scale), 1px solid var(--border). **GLASS MORPHISM UPGRADE:** For premium layouts, use glass containers with `backdrop-filter: blur(8px)`, semi-transparent backgrounds with CSS var `--glass-opacity: 0.08`, and elevated shadows. Apply selectively to hero sections or primary cards for sophisticated layering.
-- **Animations:** CSS @keyframes for page-load (.animate + .delay-N), data-reveal + IntersectionObserver for scroll, data-count for counters. Content visible by default. **Above-fold content must NEVER use data-reveal** — use `.animate` classes instead. Use `data-reveal` sparingly (max 3-4 sections) for below-fold content only.
-- **Accessibility:** Skip-to-content, aria-labels, landmark roles, :focus-visible, sr-only for chart data. See reference for full checklist.
-- **Icons:** Inline SVG only, never emojis. Lucide-style 24x24, stroke-based.
-- **Chart.js (MANDATORY PATTERNS):** `Chart.defaults.animation = false;` at top of script, destroy+recreate on theme toggle, explicit rgba() colors, tooltips always enabled, `maintainAspectRatio: false` on all chart options. **Accessibility: Wrap canvas in div with `role="img"` and descriptive `aria-label`**. **Guard pattern:** Use `chartsBuilt` flag — `onThemeChange()` must check `if (chartsBuilt)` before rebuilding. **Chart containers need min-height: 360px for substantial presence.**
-- **Chart.js customization:** Apply professional styling beyond defaults — custom padding (`layout: { padding: 30 }`), remove excessive gridlines (opacity ≤ 0.04), use rounded corners (`borderRadius: 4`), thoughtful color palettes that match theme. Chart containers need 12px border radius, 40px internal padding, and 360px minimum height for substantial presence. Avoid library defaults that look auto-generated.
-- **Typography hierarchy:** MANDATORY descending font-size scale: h1 > h2 > h3 > body text. **REQUIRED MINIMUMS:** h1: ≥3rem (48px), h2: ≥2rem (32px), h3: ≥1.5rem (24px), body: 1rem (16px). **EVALUATION CRITICAL:** Each heading level must be visibly smaller than the previous level with at least 0.5rem difference between levels. Example valid hierarchy: h1: 3rem, h2: 2.5rem, h3: 1.5rem, body: 1rem.
-- **Visual restraint:** No floating orbs, gradient borders, gradient text on headings, scale transforms, glow effects, decorative animations.
-- **Stat value colors:** Colored numbers must have semantic meaning (green/positive = good metric, red/negative = bad metric, accent = primary/neutral highlight). If no clear semantic meaning, use `var(--text)`. Never randomly colorize stat values. **For KPI grids with 4+ cards:** use at most 2 accent colors for values — `var(--accent)` for the single most important metric and `var(--text)` for all others. Reserve `var(--positive)`/`var(--negative)` only for delta indicators (arrows, percentages), not the main card value.
-- **Background atmosphere:** One subtle technique per file (radial gradient, noise texture, or dot grid). **Adapt the atmosphere to the content** — a game dashboard should feel different from a financial report. Adjust accent colors and gradient hues to match the subject matter.
-- **AI-NATIVE INFORMATION ARCHITECTURE:** Modern designs prioritize insight-driven hierarchy. Place the most important metric/insight above the fold. Use progressive revelation patterns — show key data immediately, provide drill-down on hover/click. Contextual actions should appear near relevant content. Lead with conclusions, support with details.
-- **Entrance animations mandatory:** fadeInUp + stagger on all cards/sections.
-- **Single-screen posters:** overflow:hidden + justify-content:space-between on fixed-dimension body. See reference for 9:16, 1:1, 4:5 sizing.
+**色彩：**
+- 仅使用基于类的主题（不用 @media prefers-color-scheme）
+- 深色：#0A0A0A 背景，#EDEDED 文字。浅色：#FAFAF9 背景，#0f172a 文字
+- 完整色板见参考文档。
+- **卡片：** 8px 圆角，悬停仅有阴影变化（不用 translateY/scale），1px solid var(--border)。**玻璃拟态升级：** 对于高端布局，使用带 `backdrop-filter: blur(8px)` 的玻璃容器、配合 CSS 变量 `--glass-opacity: 0.08` 的半透明背景以及更高层级的阴影。有选择地应用于 hero 区域或主要卡片，营造精致的层次感。
+- **动画：** 页面加载用 CSS @keyframes（.animate + .delay-N），滚动用 data-reveal + IntersectionObserver，计数器用 data-count。内容默认可见。**首屏内容绝不使用 data-reveal** —— 改用 `.animate` 类。`data-reveal` 要节制使用（最多 3-4 个区块），且仅用于首屏以下的内容。
+- **无障碍：** 跳转正文链接、aria-label、landmark 角色、:focus-visible、图表数据用 sr-only。完整清单见参考文档。
+- **图标：** 仅用内联 SVG，绝不用 emoji。Lucide 风格 24x24、基于描边。
+- **Chart.js（强制模式）：** 脚本顶部写 `Chart.defaults.animation = false;`，主题切换时销毁并重建图表，使用显式的 rgba() 颜色，tooltip 始终启用，所有图表选项中设置 `maintainAspectRatio: false`。**无障碍：将 canvas 包裹在带 `role="img"` 和描述性 `aria-label` 的 div 中**。**守卫模式：** 使用 `chartsBuilt` 标志 —— `onThemeChange()` 在重建前必须检查 `if (chartsBuilt)`。**图表容器需要 min-height: 360px 以保证足够的存在感。**
+- **Chart.js 定制：** 应用超越默认值的专业样式 —— 自定义内边距（`layout: { padding: 30 }`）、去除过多网格线（不透明度 ≤ 0.04）、使用圆角（`borderRadius: 4`）、与主题匹配的精心配色。图表容器需要 12px 圆角、40px 内边距和 360px 最小高度以保证足够的存在感。避免那些看起来像自动生成的库默认样式。
+- **排版层级：** 强制递减的字号阶梯：h1 > h2 > h3 > 正文。**要求的最小值：** h1：≥3rem（48px），h2：≥2rem（32px），h3：≥1.5rem（24px），正文：1rem（16px）。**评估关键：** 每一级标题必须明显小于上一级，且级与级之间至少相差 0.5rem。有效层级示例：h1: 3rem，h2: 2.5rem，h3: 1.5rem，正文: 1rem。
+- **视觉克制：** 不用悬浮光球、渐变边框、标题渐变文字、scale 变换、发光效果、装饰性动画。
+- **统计数值颜色：** 带颜色的数字必须有语义含义（绿色/正向 = 好的指标，红色/负向 = 差的指标，accent = 主要/中性强调）。若没有明确的语义含义，使用 `var(--text)`。绝不随意给统计数值上色。**对于 4 张以上卡片的 KPI 网格：** 数值最多使用 2 种强调色 —— 唯一最重要的指标用 `var(--accent)`，其余全部用 `var(--text)`。`var(--positive)`/`var(--negative)` 仅保留给增减指示（箭头、百分比），不用于卡片主数值。
+- **背景氛围：** 每个文件只用一种细腻的手法（径向渐变、噪点纹理或点阵网格）。**让氛围与内容匹配** —— 游戏仪表盘的感觉应不同于财务报告。根据主题内容调整强调色和渐变色调。
+- **AI 原生信息架构：** 现代设计优先采用洞察驱动的层级。把最重要的指标/洞察放在首屏。使用渐进式披露模式 —— 立即展示关键数据，悬停/点击时提供下钻。上下文操作应出现在相关内容附近。先给结论，再用细节支撑。
+- **入场动画为强制项：** 所有卡片/区块使用 fadeInUp + 错落延迟。
+- **单屏海报：** 固定尺寸的 body 上使用 overflow:hidden + justify-content:space-between。9:16、1:1、4:5 尺寸见参考文档。
 
 
-## Critical Implementation Requirements
+## 关键实现要求
 
-**MANDATORY: Use the skeleton template** — see [references/skeleton.md](references/skeleton.md) for complete copy-paste HTML with all requirements built-in.
+**强制：使用骨架模板** —— 完整的可复制粘贴、内置所有要求的 HTML 见 [references/skeleton.md](references/skeleton.md)。
 
-**JavaScript Implementation Rules:**
-- **All top-level variables MUST use `var`** (not `let`/`const`) to avoid TDZ errors with function hoisting
-- **Theme toggle MUST use `cycleTheme()` function** — this is built into the skeleton with proper `applyTheme()` implementation
-- **Menu MUST use `toggleMenu()` with outside-click handling** — skeleton includes automatic dropdown closure on outside clicks and escape key
-- **Chart rebuilding:** Define `function onThemeChange() {}` for chart re-rendering on theme changes
-- **Mobile responsive:** Test all layouts at 375px viewport width — use CSS Grid `minmax(320px, 1fr)` for card grids
+**JavaScript 实现规则：**
+- **所有顶层变量必须使用 `var`**（而非 `let`/`const`），以避免函数提升相关的 TDZ 错误
+- **主题切换必须使用 `cycleTheme()` 函数** —— 骨架中已内置该函数及正确的 `applyTheme()` 实现
+- **菜单必须使用带外部点击处理的 `toggleMenu()`** —— 骨架包含点击外部和按 Esc 键时自动关闭下拉菜单
+- **图表重建：** 定义 `function onThemeChange() {}` 用于主题变化时重新渲染图表
+- **移动端响应式：** 在 375px 视口宽度下测试所有布局 —— 卡片网格使用 CSS Grid `minmax(320px, 1fr)`
 
-**Evaluation Checkers Expect:**
-- `cycleTheme()` function exists and works (changes html class)
-- `toggleMenu()` function exists and closes on outside clicks  
-- Top-level JS variables are declared with `var`
-- No horizontal overflow at 375px width
-- Interactive elements beyond basic menu (hover states, chart interactions, etc.)
+**评估检查器期望：**
+- `cycleTheme()` 函数存在且可用（更改 html 的类）
+- `toggleMenu()` 函数存在且点击外部时关闭
+- 顶层 JS 变量用 `var` 声明
+- 375px 宽度下无水平溢出
+- 基础菜单之外还有交互元素（悬停状态、图表交互等）
 
-**The skeleton template automatically provides all required functionality. ALWAYS start from skeleton.md to avoid implementation errors.**
+**骨架模板自动提供所有必需功能。务必从 skeleton.md 开始，以避免实现错误。**
 
-## Semantic HTML Requirements
+## 语义化 HTML 要求
 
-All visualizations must include these semantic elements:
+所有可视化都必须包含这些语义化元素：
 
-**Required Structure:**
-- `<main>` element containing primary content
-- `<section>` elements for major content blocks
-- Landmark roles (`role="banner"`, `role="main"`, `role="complementary"`) OR skip-to-content link
-- Chart accessibility: `role="img"` and `aria-label` on chart containers
+**必需结构：**
+- 包含主要内容的 `<main>` 元素
+- 用于主要内容区块的 `<section>` 元素
+- Landmark 角色（`role="banner"`、`role="main"`、`role="complementary"`）或跳转正文链接
+- 图表无障碍：图表容器上有 `role="img"` 和 `aria-label`
 
-**Additional Requirements:**
-- `@media print` styles defined
-- `@media (prefers-reduced-motion)` styles for accessibility
-- Adequate spacing between sections (≥48px)
-- Hover states for interactive elements
+**附加要求：**
+- 定义 `@media print` 样式
+- 用于无障碍的 `@media (prefers-reduced-motion)` 样式
+- 区块之间有充足间距（≥48px）
+- 交互元素有悬停状态
+## 可视化类型
 
-## Visualization Types
+选择正确的形式。详细模式见 [references/types.md](references/types.md)。
 
-Choose the right format. See [references/types.md](references/types.md) for detailed patterns.
-
-| Type | When to Use | Key Feature |
+| 类型 | 适用场景 | 关键特性 |
 |------|-------------|-------------|
-| **Slide Deck** | Presentations, pitches | 16:9, keyboard nav, transitions |
-| **Infographic** | Data summaries, visual stories | Long scroll, big numbers, sections |
-| **Dashboard** | Metrics, KPIs | Grid of cards + charts |
-| **Flowchart** | Processes, architecture | Mermaid or SVG diagrams |
-| **Timeline** | Chronological events | Alternating left/right, scroll-triggered |
-| **Comparison** | Side-by-side analysis | Feature matrix, pros/cons |
-| **Data Viz** | Charts, data stories | Chart.js or D3 |
-| **One-Pager** | Summaries, briefs | Single viewport, print-friendly |
-| **Mind Map** | Concept relationships | Radial SVG layout |
-| **Kanban** | Status tracking | Column-based cards |
-| **Carousel Cards** | Social media (IG/LinkedIn) | 1080×1080 per card, swipeable, bold text |
-| **Event Poster** | Conferences, meetups, webinars | Portrait A4/letter, bold headline, date/venue |
-| **Resume/CV** | Job applications | One-page, two-column, print-optimized |
-| **Banner/Header** | Email, blog, social cover | 1200×630 or 1500×500, centered text on visual bg |
-| **Quote Card** | Social proof, testimonials | Portrait/square, large quote, attribution |
-| **Process Guide** | How-to, step-by-step | Numbered steps, icons, clear flow |
-| **Status Report** | Executive updates | KPIs + progress bars + highlights, one-page |
-| **Org Chart** | Team structure | Hierarchical tree, photos/avatars, roles |
-| **Data Story** | Narrative + data | Scrollytelling, charts woven with narrative text |
-| **Product Card** | Feature highlight, launch | Hero image area, feature pills, CTA |
+| **幻灯片** | 演示、路演 | 16:9、键盘导航、转场 |
+| **信息图** | 数据摘要、视觉叙事 | 长滚动、大数字、分区 |
+| **仪表盘** | 指标、KPI | 卡片 + 图表网格 |
+| **流程图** | 流程、架构 | Mermaid 或 SVG 图示 |
+| **时间线** | 按时间顺序的事件 | 左右交替、滚动触发 |
+| **对比** | 并排分析 | 功能矩阵、优劣对比 |
+| **数据可视化** | 图表、数据故事 | Chart.js 或 D3 |
+| **单页** | 摘要、简报 | 单一视口、适合打印 |
+| **思维导图** | 概念关系 | 放射状 SVG 布局 |
+| **看板** | 状态跟踪 | 分列卡片 |
+| **轮播卡片** | 社交媒体（IG/LinkedIn） | 每张 1080×1080、可滑动、粗体文字 |
+| **活动海报** | 会议、聚会、网络研讨会 | 竖版 A4/letter、醒目大标题、日期/地点 |
+| **简历/CV** | 求职 | 单页、双栏、针对打印优化 |
+| **横幅/头图** | 邮件、博客、社交封面 | 1200×630 或 1500×500、视觉背景上居中文字 |
+| **金句卡片** | 社交证明、用户评价 | 竖版/方形、大号引文、署名 |
+| **流程指南** | 操作指引、分步说明 | 编号步骤、图标、清晰流程 |
+| **状态报告** | 高管汇报 | KPI + 进度条 + 亮点，单页 |
+| **组织结构图** | 团队架构 | 层级树、照片/头像、职位 |
+| **数据故事** | 叙事 + 数据 | 滚动叙事，图表与叙述文字交织 |
+| **产品卡片** | 功能亮点、发布 | 主视觉图区域、功能标签、CTA |
 
-### Carousel Card Rules
+### 轮播卡片规则
 
-Carousel cards are huge for social media. Get these right:
+轮播卡片在社交媒体上非常重要。务必做到以下几点：
 
-- **Square format** — `1080×1080px` (or configurable via CSS var)
-- **One idea per card** — bold headline + 1-2 supporting points max
-- **Swipe nav** — arrows + dots + touch swipe + keyboard
-- **Card counter** — "3 / 8" visible
-- **Download all** — PNG export of individual cards or full set
-- **Typography dominates** — headline at 2.5-4rem, minimal body text
-- **Color-coded** — each card can have a subtle accent shift
-- **Print layout** — grid of all cards for printing
-- **Max 10 cards** — keep it focused
+- **方形格式** —— `1080×1080px`（或可通过 CSS 变量配置）
+- **一张卡片一个观点** —— 粗体大标题 + 最多 1-2 个支撑要点
+- **滑动导航** —— 箭头 + 圆点 + 触摸滑动 + 键盘
+- **卡片计数器** —— 显示 "3 / 8"
+- **全部下载** —— 支持导出单张卡片或全套 PNG
+- **排版主导** —— 标题 2.5-4rem，正文文字极少
+- **色彩编码** —— 每张卡片可以有细微的强调色变化
+- **打印布局** —— 供打印的所有卡片网格
+- **最多 10 张卡片** —— 保持聚焦
 
-### Event Poster Rules
+### 活动海报规则
 
-- **Portrait orientation** — A4/letter ratio or square
-- **Visual hierarchy** — Event name (largest) → Date/Time → Location → Description → CTA
-- **Bold headline** — 3-5rem, max 6 words
-- **Date/time prominent** — styled as a badge or highlighted block
-- **QR code area** — placeholder box for registration link
-- **Print-first** — looks great printed, dark or light theme
+- **竖版方向** —— A4/letter 比例或方形
+- **视觉层级** —— 活动名称（最大）→ 日期/时间 → 地点 → 描述 → CTA
+- **醒目大标题** —— 3-5rem，最多 6 个单词
+- **日期/时间突出** —— 以徽章或高亮区块形式呈现
+- **二维码区域** —— 报名链接的占位框
+- **打印优先** —— 打印效果好，深色或浅色主题皆可
 
-### Quote Card Rules
+### 金句卡片规则
 
-- **Large quotation marks** — decorative " " in accent color, oversized
-- **Quote text** — 1.5-2.5rem, serif or italic weight for contrast
-- **Attribution** — name, title, company below quote
-- **Square or portrait** — optimized for social sharing
-- **Minimal design** — quote is the hero, everything else is subtle
+- **大号引号** —— 用强调色绘制的装饰性 " "，超大尺寸
+- **引文文字** —— 1.5-2.5rem，用衬线体或斜体字重形成对比
+- **署名** —— 引文下方为姓名、职位、公司
+- **方形或竖版** —— 针对社交分享优化
+- **极简设计** —— 引文是主角，其他一切都要低调
 
-### Single-Screen / Mobile-Fit Rules (Posters, Cards, One-Pagers)
+### 单屏 / 移动端适配规则（海报、卡片、单页）
 
-When the user asks for something that fits "one screen," "phone screen," "9:16," or "mobile-fit," create a **fixed-dimension single-viewport** visualization — NOT a scrolling page.
+当用户要求 "一屏"、"手机屏幕"、"9:16" 或 "移动端适配" 的内容时，创建**固定尺寸单视口**可视化 —— 而不是可滚动页面。
 
-**Dimensions:**
-- **9:16 portrait (phone):** `width: 1080px; height: 1920px;` — standard Instagram Story / phone screen
-- **1:1 square:** `width: 1080px; height: 1080px;` — Instagram post
-- **4:5 portrait:** `width: 1080px; height: 1350px;` — Instagram portrait post
-- **16:9 landscape:** `width: 1920px; height: 1080px;` — presentation slide
+**尺寸：**
+- **9:16 竖版（手机）：** `width: 1080px; height: 1920px;` —— 标准 Instagram Story / 手机屏幕
+- **1:1 方形：** `width: 1080px; height: 1080px;` —— Instagram 帖子
+- **4:5 竖版：** `width: 1080px; height: 1350px;` —— Instagram 竖版帖子
+- **16:9 横版：** `width: 1920px; height: 1080px;` —— 演示幻灯片
 
-**Critical CSS pattern:**
+**关键 CSS 模式：**
 ```css
 body {
   width: 1080px; height: 1920px; /* or chosen ratio */
@@ -344,65 +342,65 @@ body {
 .poster-footer { padding: 16px 48px 36px; }
 ```
 
-**Layout rules:**
-- `overflow: hidden` on body — this is what makes it "one screen." Non-negotiable.
-- `justify-content: space-between` on the main container — distributes sections evenly with NO dead gaps.
-- **Use `flex: 1` on the main content area** (grid, body, etc.) so it expands to fill ALL remaining space between header and footer. Never use fixed `height` values that leave dead space.
-- Wrap each logical section in a `<div>` so flexbox distributes them as blocks.
-- **Zero dead space rule:** The poster canvas should be 100% utilized. No large empty margins at bottom or sides. If there's visible empty space, either expand content to fill it or reduce padding. Content should feel like it "fits" the frame perfectly.
-- **Test mentally:** count your sections, divide 1920px among them. Each section gets ~200-300px. If content is sparse, make elements bigger (larger fonts, more padding, bigger icons).
-- **No hamburger menu** for fixed-dimension posters — it wastes space and the poster is meant for screenshot/export, not interaction.
+**布局规则：**
+- body 上设 `overflow: hidden` —— 这正是实现 "一屏" 的关键。不可妥协。
+- 主容器上设 `justify-content: space-between` —— 让各区块均匀分布，不留空白间隙。
+- **在主内容区域（网格、主体等）使用 `flex: 1`**，使其扩展填满页头与页脚之间的所有剩余空间。绝不使用会留下空白区域的固定 `height` 值。
+- 将每个逻辑区块包裹在 `<div>` 中，让 flexbox 将它们作为块级元素分布。
+- **零空白规则：** 海报画布应 100% 利用。底部或两侧不留大块空白边距。如果存在可见的空白，要么扩展内容去填满，要么减小内边距。内容应让人感觉与画框 "完美贴合"。
+- **脑中预演测试：** 数一下你的区块数，把 1920px 分摊给它们。每个区块约得 200-300px。如果内容稀少，就把元素做大（更大字号、更多内边距、更大图标）。
+- 固定尺寸海报**不用汉堡菜单** —— 它浪费空间，而且海报是用来截图/导出的，不是用来交互的。
 
-**Content density for 9:16:**
-- Hero (title + subtitle): ~25% of height
-- 2-3 content sections: ~55% of height
-- Footer/CTA: ~10% of height
-- Breathing room (gaps): ~10% of height
-- **If it looks empty, your content is too small.** Scale up fonts, add more grid items, use larger icons.
+**9:16 的内容密度：**
+- 主视觉（标题 + 副标题）：约 25% 高度
+- 2-3 个内容区块：约 55% 高度
+- 页脚/CTA：约 10% 高度
+- 呼吸空间（间隙）：约 10% 高度
+- **如果看起来空，说明内容太小。** 放大字号、增加网格项、使用更大的图标。
 
-**Font sizing for 1080px-wide posters:**
-- Hero h1: `68-80px` (bigger than web — this is a poster)
-- Section labels: `15-18px` uppercase, letter-spacing `0.06em`
-- Card text: `16-20px`
-- Body: `20-24px`
+**1080px 宽海报的字号：**
+- 主视觉 h1：`68-80px`（比网页更大 —— 这是海报）
+- 区块标签：`15-18px` 全大写，字距 `0.06em`
+- 卡片文字：`16-20px`
+- 正文：`20-24px`
 
-**Common mistake:** Making a scrolling page and screenshotting it. That's NOT a poster — it's a webpage screenshot. A poster is a fixed canvas where every pixel is intentional.
+**常见错误：** 做一个可滚动页面然后截图。那不是海报 —— 那只是网页截图。海报是一块固定画布，每一个像素都经过刻意安排。
 
-## Slide Deck Rules
+## 幻灯片规则
 
-Slides are the most common request. Get these right:
+幻灯片是最常见的需求。务必做到以下几点：
 
-- **16:9 aspect ratio** — `100vw × 100vh`, content centered
-- **Responsive breakpoints** — Use `clamp()` and container queries for mobile-friendly slides:
+- **16:9 宽高比** —— `100vw × 100vh`，内容居中
+- **响应式断点** —— 使用 `clamp()` 和容器查询实现移动端友好的幻灯片：
   ```css
   .slide-container { container-type: inline-size; }
   .slide-title { font-size: clamp(2rem, 8vw, 4rem); }
   @container (width < 768px) { .slide-content { padding: 1rem; } }
   ```
-- **One idea per slide** — if you need a second thought, make a second slide
-- **Max 40 words per slide** — more than that, split or use visuals
-- **Headlines max 6 words** — short, punchy, memorable
-- **Big number + small label** for stat slides — number at 3-5rem, label at 0.875rem
-- **Keyboard nav** — ← → arrows, Space, Enter
-- **Touch nav** — swipe left/right
-- **Click nav** — left third = prev, right two-thirds = next
-- **Progress bar** — thin gradient bar at top showing position
-- **Slide counter** — "3 / 12" in bottom nav
-- **Mobile navigation prominence** — Ensure navigation controls are clearly visible on mobile. Use larger touch targets (min 44px), contrasting colors, and backdrop-blur for floating nav
-- **Smooth transitions** — `transform: translateX()` with 500ms cubic-bezier
-- **Entrance animations** — elements within slides animate in with staggered delays
-- **Speaker notes** — `data-notes` attribute, visible in print only
+- **一张幻灯片一个观点** —— 如果有第二个想法，就做第二张幻灯片
+- **每张幻灯片最多 40 个单词** —— 超出就拆分或改用视觉表达
+- **标题最多 6 个单词** —— 简短、有力、易记
+- **统计幻灯片用大数字 + 小标签** —— 数字 3-5rem，标签 0.875rem
+- **键盘导航** —— ← → 方向键、Space、Enter
+- **触摸导航** —— 左右滑动
+- **点击导航** —— 左侧三分之一 = 上一张，右侧三分之二 = 下一张
+- **进度条** —— 顶部细渐变条显示当前位置
+- **幻灯片计数器** —— 底部导航中显示 "3 / 12"
+- **移动端导航显著性** —— 确保导航控件在移动端清晰可见。使用更大的触控目标（最小 44px）、对比色，浮动导航使用 backdrop-blur
+- **平滑转场** —— `transform: translateX()` 配合 500ms cubic-bezier
+- **入场动画** —— 幻灯片内元素以错落延迟依次动画进入
+- **演讲者备注** —— `data-notes` 属性，仅打印时可见
 
-### High-Impact Presentation Slides (Business Context)
-For investor presentations, startup pitches, and executive briefings:
-- **Hero slide visual weight** — Use stronger gradients, larger typography (4-6rem), and compelling statistics prominently displayed
-- **Value proposition clarity** — Hero should communicate core value in under 5 seconds
-- **Professional credibility** — Ensure typography, spacing, and color choices match enterprise/investment-grade expectations
-- **Data storytelling** — Each chart slide should have clear insight callouts, not just raw data visualization
+### 高影响力演示幻灯片（商务场景）
+适用于投资人演示、创业路演和高管简报：
+- **主视觉幻灯片的视觉分量** —— 使用更强的渐变、更大的字号（4-6rem），并醒目展示有说服力的统计数据
+- **价值主张清晰** —— 主视觉应在 5 秒内传达核心价值
+- **专业可信度** —— 确保排版、间距和配色符合企业级/投资级的期望
+- **数据讲故事** —— 每张图表幻灯片都应有清晰的洞察标注，而不只是原始数据可视化
 
-### Theme-Aware Slide Gradients (CRITICAL)
+### 主题感知的幻灯片渐变（关键）
 
-Slide decks MUST look visually distinct in dark vs light themes. Gradient backgrounds must change:
+幻灯片在深色与浅色主题下必须呈现出明显的视觉差异。渐变背景必须随之变化：
 
 ```css
 /* Dark theme: deep, saturated gradients */
@@ -414,25 +412,25 @@ Slide decks MUST look visually distinct in dark vs light themes. Gradient backgr
 .theme-light .slide-content { background: var(--bg); }
 ```
 
-Rules:
-- Title/section slides: use theme-specific gradient pairs (dark=deep+saturated, light=soft+pastel). **Choose gradient colors that evoke the content's subject matter** — a tech pitch uses cool blues, a game pitch uses vibrant purples/cyans, a healthcare deck uses calming greens/teals.
-- Content slides: use `var(--bg)` or `var(--surface)` — NOT hardcoded dark backgrounds
-- Data cards on slides: use `var(--surface)` with `var(--border)` — they auto-adapt
-- Never hardcode `#1a1a2e` or similar dark colors on slide content — use CSS variables
-- Test: toggle theme and every slide should look intentionally designed for that mode
+规则：
+- 标题/章节幻灯片：使用主题专属的渐变组合（深色=深邃+饱和，浅色=柔和+淡雅）。**选择能唤起内容主题的渐变颜色** —— 科技路演用冷蓝色，游戏路演用鲜亮的紫色/青色，医疗健康幻灯片用宁静的绿色/蓝绿色。
+- 内容幻灯片：使用 `var(--bg)` 或 `var(--surface)` —— 不要用硬编码的深色背景
+- 幻灯片上的数据卡片：使用 `var(--surface)` 配 `var(--border)` —— 它们会自动适配
+- 绝不在幻灯片内容上硬编码 `#1a1a2e` 或类似深色 —— 使用 CSS 变量
+- 测试：切换主题后，每张幻灯片都应像是为该模式量身设计的
 
-### Slide Types
-1. **Title** — theme-aware gradient background, big headline, subtitle. Center aligned.
-2. **Content** — heading + bullets OR heading + visual. Never text-heavy.
-3. **Section divider** — full-bleed accent color, section title only.
-4. **Stat** — one big number, one label, one insight sentence.
-5. **Chart** — Chart.js visualization with title and key takeaway. MUST use chart-container wrapper class.
-6. **Two-column** — split layout for comparisons, text+visual.
-7. **Quote** — large pull quote with attribution.
-8. **Closing** — CTA, contact info, or summary + social links.
+### 幻灯片类型
+1. **标题页** —— 主题感知的渐变背景、大标题、副标题。居中对齐。
+2. **内容页** —— 标题 + 要点列表，或标题 + 视觉元素。绝不堆砌文字。
+3. **章节分隔页** —— 全幅强调色，仅有章节标题。
+4. **统计页** —— 一个大数字、一个标签、一句洞察。
+5. **图表页** —— 带标题和关键要点的 Chart.js 可视化。必须使用 chart-container 包裹类。
+6. **双栏页** —— 用于对比、文字+视觉的分栏布局。
+7. **金句页** —— 带署名的大号引文。
+8. **结尾页** —— CTA、联系方式，或总结 + 社交链接。
 
-### Slide Deck Chart Requirements (CRITICAL)
-Chart slides in presentations MUST follow the same container standards as dashboards:
+### 幻灯片图表要求（关键）
+演示中的图表幻灯片必须遵循与仪表盘相同的容器标准：
 ```html
 <div class="chart-slide-container">
   <h2>Chart Title</h2>
@@ -441,57 +439,56 @@ Chart slides in presentations MUST follow the same container standards as dashbo
   </div>
 </div>
 ```
-- **Use chart-container class** — maintains evaluation consistency across formats
-- **Minimum height 400px** for slide charts — larger than dashboard charts for presentation readability
-- **maintainAspectRatio: false** — required for proper sizing in slide layouts
+- **使用 chart-container 类** —— 保持各形式之间评估的一致性
+- 幻灯片图表**最小高度 400px** —— 比仪表盘图表更大，以保证演示时的可读性
+- **maintainAspectRatio: false** —— 幻灯片布局中正确调整尺寸所必需
+## 数据摄取
 
-## Data Ingestion
+当用户提供数据时：
+- **CSV** —— 用 JS 解析，自动识别表头，渲染合适的图表类型
+- **JSON** —— 将键提取为标签、值作为数据、嵌套对象作为系列
+- **表格** —— 转换为视觉对比或图表
+- **文本中的数字** —— 提取并以统计卡片形式突出显示
+- **URL** —— 抓取、提取关键信息、以摘要形式可视化
 
-When user provides data:
-- **CSV** — parse with JS, auto-detect headers, render appropriate chart type
-- **JSON** — extract keys as labels, values as data, nested objects as series
-- **Tables** — convert to visual comparison or chart
-- **Numbers in text** — extract and highlight as stat cards
-- **URLs** — crawl, extract key info, visualize as summary
+## 上下文感知
 
-## Context Awareness
+此 skill 在对话过程中被使用。要利用一切：
 
-This skill is used mid-conversation. Leverage everything:
+- **对话上下文** —— 对已讨论的内容进行总结、结构化或可视化
+- **URL/链接** —— 抓取并提取内容，然后可视化
+- **粘贴的数据** —— CSV、JSON、表格 → 图表、仪表盘
+- **想法/概念** —— 将抽象讨论转化为视觉图示
+- **代码/架构** —— 可视化系统设计、数据流
 
-- **Conversation context** — summarize, structure, or visualize what's been discussed
-- **URLs/links** — crawl and extract content, then visualize
-- **Pasted data** — CSV, JSON, tables → charts, dashboards
-- **Ideas/concepts** — turn abstract discussions into visual diagrams
-- **Code/architecture** — visualize system designs, data flows
+始终使用真实内容。存在真实上下文时，绝不生成占位数据。
 
-Always use real content. Never generate placeholder data when real context exists.
+## 按类型的交互性（强制）
 
-## Type-Specific Interactivity (Mandatory)
+除主题切换 + 菜单外，每个文件必须至少有一个有意义的交互。静态感强的页面在交互性上得分低。
 
-Every file MUST have at least ONE meaningful interaction beyond theme toggle + menu. Static-feeling pages score low on interactivity.
-
-| Type | Required Interaction |
+| 类型 | 必需的交互 |
 |------|---------------------|
-| **Cheatsheet** | Search/filter input + copy-to-clipboard on code blocks. Use `<details name="...">` for collapsible groups. |
-| **Dashboard** | Filter toolbar or metric drill-down. At minimum: date range or category filter. |
-| **Status Report** | Collapsible detail sections (use `<details>`). Progress bars animate on scroll. |
-| **Quote Card** | Auto-cycling quotes OR swipeable carousel. Share/copy button. |
-| **Event Poster** | Animated countdown timer (days/hours/min/sec). RSVP/register button. |
-| **Process Guide** | Steps as exclusive accordion (`<details name="steps">`). Or interactive progress tracker. |
-| **Architecture** | Clickable nodes with popover details (use Popover API). Hover highlights connections. |
-| **Timeline** | Filter by era/category. Or click to expand event details. |
-| **Comparison** | Toggle categories on/off. Or highlight winner per row. |
-| **Carousel** | Touch swipe + keyboard + auto-advance option. Card counter always visible. |
-| **Slide Deck** | Already interactive (nav). Add: presenter timer, slide overview grid. |
+| **速查表** | 搜索/筛选输入框 + 代码块一键复制。可折叠分组使用 `<details name="...">`。 |
+| **仪表盘** | 筛选工具栏或指标下钻。至少要有：日期范围或类别筛选。 |
+| **状态报告** | 可折叠的详情区块（使用 `<details>`）。进度条在滚动时动画。 |
+| **金句卡片** | 自动轮换金句或可滑动轮播。分享/复制按钮。 |
+| **活动海报** | 动画倒计时器（天/时/分/秒）。报名/注册按钮。 |
+| **流程指南** | 步骤做成互斥手风琴（`<details name="steps">`）。或交互式进度跟踪器。 |
+| **架构** | 可点击节点带 popover 详情（使用 Popover API）。悬停高亮连接关系。 |
+| **时间线** | 按时期/类别筛选。或点击展开事件详情。 |
+| **对比** | 开关各类别。或逐行高亮优胜者。 |
+| **轮播** | 触摸滑动 + 键盘 + 自动播放选项。卡片计数器始终可见。 |
+| **幻灯片** | 已有交互（导航）。补充：演讲者计时器、幻灯片总览网格。 |
 
-If a type isn't listed, add at minimum: a filter, search, sort, or expand/collapse interaction.
+若某个类型未列出，至少添加：筛选、搜索、排序或展开/折叠交互。
 
-## Layout Variation (CRITICAL)
+## 布局多样性（关键）
 
-Every file must feel like a UNIQUE design, not a template with different text. Vary these per file type:
-- **Grid structure**: Mix 1-col, 2-col, 3-col. Use CSS Grid `span 2` for featured cards. **CRITICAL: Always test at 768px and 375px - no horizontal overflow allowed.**
+每个文件都必须感觉是独一无二的设计，而不是换了文字的同款模板。按文件类型变化以下方面：
+- **网格结构**：混用单列、双列、三列。重点卡片使用 CSS Grid `span 2`。**关键：务必在 768px 和 375px 下测试 —— 不允许水平溢出。**
 
-**Mobile-First Responsive Pattern (MANDATORY):**
+**移动优先响应式模式（强制）：**
 ```css
 .grid { 
   display: grid; 
@@ -507,92 +504,91 @@ Every file must feel like a UNIQUE design, not a template with different text. V
   .stat-value { font-size: 2rem; }
 }
 ```
-- **Section rhythm**: Alternate between full-width sections, card grids, and single-focus sections.
-- **Content density**: More content at smaller sizes looks more professional than sparse content at large sizes. A dashboard with 8 KPI cards + 4 charts feels real; 4 KPI cards + 2 charts feels like a demo.
-- **Visual focal point**: Every file needs ONE visually dominant element (hero stat, key chart, primary message) — not everything at equal weight.
-- **No orphaned grid items**: When a grid has an odd number of items where the last row isn't full, use `grid-column: span 2` on the last item or adjust `grid-template-columns` to avoid a single card stranded alone on a row.
+- **区块节奏**：全宽区块、卡片网格、单焦点区块交替使用。
+- **内容密度**：小尺寸下的丰富内容比大尺寸下的稀疏内容显得更专业。8 张 KPI 卡片 + 4 个图表的仪表盘感觉真实；4 张 KPI 卡片 + 2 个图表则像演示样例。
+- **视觉焦点**：每个文件需要一个视觉上占主导的元素（核心统计、关键图表、主要信息）—— 不能让所有东西权重相同。
+- **不留孤立的网格项**：当网格项数量为奇数导致最后一行不满时，对最后一项使用 `grid-column: span 2` 或调整 `grid-template-columns`，避免一张卡片孤零零地落在一行。
 
-## Anti-Patterns
+## 反模式
 
-- ❌ Walls of text — if it reads like a document, it's not a visualization
-- ❌ Tiny fonts — minimum 14px body, 20px+ for presentation headings
-- ❌ Rainbow colors — stick to 2-3 colors from the palette + neutrals
-- ❌ Placeholder content — never use "Lorem ipsum" or fake data
-- ❌ Over-engineering — simplest approach that looks stunning
-- ❌ Cramped layouts — when in doubt, add more whitespace
-- ❌ Generic design — each visualization should feel intentional, not templated
-- ❌ Missing menu — every output needs the hamburger menu
-- ❌ Broken print — always include `@media print` styles
+- ❌ 大段文字墙 —— 如果读起来像文档，它就不是可视化
+- ❌ 过小的字号 —— 正文最小 14px，演示标题 20px+
+- ❌ 彩虹配色 —— 只用色板中的 2-3 种颜色 + 中性色
+- ❌ 占位内容 —— 绝不使用 "Lorem ipsum" 或假数据
+- ❌ 过度设计 —— 用最简单的方案做出惊艳效果
+- ❌ 拥挤布局 —— 拿不准时，就加更多留白
+- ❌ 千篇一律的设计 —— 每个可视化都应感觉经过刻意设计，而非套模板
+- ❌ 缺少菜单 —— 每个输出都需要汉堡菜单
+- ❌ 打印损坏 —— 始终包含 `@media print` 样式
 
-## Advanced Techniques
+## 高级技巧
 
-Use these when they add value. See [references/css-techniques.md](references/css-techniques.md) for code snippets.
+在能增加价值时使用这些技巧。代码片段见 [references/css-techniques.md](references/css-techniques.md)。
 
-- **Glass morphism** — `backdrop-blur-md bg-white/5 border border-white/10` for floating cards
-- **Gradient text** — `background: linear-gradient(...); -webkit-background-clip: text` for hero headlines
-- **Scroll-snap** — `scroll-snap-type: y mandatory` as alternative slide navigation (no JS needed)
-- **Conic gradients** — `conic-gradient()` for pure CSS pie/donut charts
-- **Number animations** — animate counters from 0 to target value on scroll
-- **Spring easing** — `cubic-bezier(0.34, 1.56, 0.64, 1)` for playful micro-interactions
-- **Animate to auto** — `interpolate-size: allow-keywords` on `:root` enables smooth `height: auto` transitions (Chrome 129+)
-- **CSS counters** — auto-numbering for step-by-step processes
-- **View Transitions API** — smooth theme switching animations
-- **Inline SVG icons** — draw simple icons as `<svg>` paths, no icon library needed
+- **玻璃拟态** —— 浮动卡片使用 `backdrop-blur-md bg-white/5 border border-white/10`
+- **渐变文字** —— 主视觉标题使用 `background: linear-gradient(...); -webkit-background-clip: text`
+- **滚动吸附** —— 用 `scroll-snap-type: y mandatory` 作为替代的幻灯片导航（无需 JS）
+- **锥形渐变** —— 用 `conic-gradient()` 实现纯 CSS 饼图/环形图
+- **数字动画** —— 滚动时让计数器从 0 动画到目标值
+- **弹簧缓动** —— 用 `cubic-bezier(0.34, 1.56, 0.64, 1)` 实现俏皮的微交互
+- **动画到 auto** —— 在 `:root` 上设置 `interpolate-size: allow-keywords` 可实现平滑的 `height: auto` 过渡（Chrome 129+）
+- **CSS 计数器** —— 为分步流程自动编号
+- **View Transitions API** —— 平滑的主题切换动画
+- **内联 SVG 图标** —— 用 `<svg>` 路径绘制简单图标，无需图标库
 
-## Mandatory HTML Skeleton
+## 强制 HTML 骨架
 
-**EVERY visualization MUST start from the skeleton.** Copy it, then add content.
+**每个可视化都必须从骨架开始。** 先复制骨架，再添加内容。
 
-**Full skeleton code:** See [references/skeleton.md](references/skeleton.md) for the complete copy-paste HTML template with themes, print styles, Inter font, animations, menu, and hover effects.
+**完整骨架代码：** 完整的可复制粘贴 HTML 模板（含主题、打印样式、Inter 字体、动画、菜单和悬停效果）见 [references/skeleton.md](references/skeleton.md)。
 
-The skeleton provides:
-- Class-based dark/light theming (OS detection on first visit, localStorage persistence)
-- CSS @keyframes animations (fadeInUp, fadeIn, slideInLeft, slideInRight) + .animate/.delay-N classes
-- Scroll-reveal via data-reveal attribute + IntersectionObserver
-- Number counter via data-count attribute
-- Hamburger menu with theme toggle, PNG download (html-to-image), print/PDF
-- Popover and details accordion CSS (Chrome 114+/120+)
-- Print styles with @page margin boxes
-- prefers-reduced-motion support
+骨架提供：
+- 基于类的深色/浅色主题（首次访问检测操作系统偏好，localStorage 持久化）
+- CSS @keyframes 动画（fadeInUp、fadeIn、slideInLeft、slideInRight）+ .animate/.delay-N 类
+- 通过 data-reveal 属性 + IntersectionObserver 实现滚动显现
+- 通过 data-count 属性实现数字计数器
+- 带主题切换、PNG 下载（html-to-image）、打印/PDF 的汉堡菜单
+- Popover 和 details 手风琴 CSS（Chrome 114+/120+）
+- 带 @page 边距框的打印样式
+- prefers-reduced-motion 支持
 
-### Skeleton Rules
-- Use `var` for all top-level JS variables (prevents TDZ errors)
-- MANDATORY: Use `data-reveal` for scroll animation OR `.animate.delay-N` for page-load entrance. Add JavaScript scroll observer for `.reveal` classes.
-- Define `function onThemeChange() {}` to re-render charts on theme toggle
-- Use semantic HTML: `<main>`, `<section>`, `<header>`, `<article>`
-- Don't use `let`/`const` at script top level
+### 骨架规则
+- 所有顶层 JS 变量使用 `var`（防止 TDZ 错误）
+- 强制：滚动动画使用 `data-reveal`，页面加载入场使用 `.animate.delay-N`。为 `.reveal` 类添加 JavaScript 滚动观察器。
+- 定义 `function onThemeChange() {}` 以在主题切换时重新渲染图表
+- 使用语义化 HTML：`<main>`、`<section>`、`<header>`、`<article>`
+- 不要在脚本顶层使用 `let`/`const`
 
-## Minimum Sizing Rules
+## 最小尺寸规则
 
-Elements must be large enough to read and feel substantial:
+元素必须足够大，可读且有分量感：
 
-- **Timeline cards:** minimum width 280px, minimum padding 20px
-- **Timeline layout:** Distribute timeline items evenly to prevent large gaps. If you have 5 items but only fill 60% of the vertical space, add more content sections (like investment breakdown or impact metrics) to fill the remaining 40%. Never leave massive empty spaces below the last timeline item.
-- **Chart containers:** minimum 60% of parent width, minimum height 300px (360px+ for dashboards). In grid layouts, charts should use `flex-grow: 1` to fill available space — 300px is a floor, not a target.
-- **Stat numbers:** minimum font-size 2rem (32px), bold/extrabold weight
-- **Card content area:** minimum padding 24px
-- **Section spacing:** **MANDATORY minimum 48px between major sections** — use `margin-bottom: 48px` or larger on section elements
-- **Slide headings:** minimum 2rem (32px), maximum 6 words
-- **Body text:** minimum 1rem (16px), never smaller
+- **时间线卡片：** 最小宽度 280px，最小内边距 20px
+- **时间线布局：** 均匀分布时间线项目以防止大段空隙。如果有 5 个项目但只填满 60% 的垂直空间，就增加更多内容区块（如投入明细或影响力指标）来填满剩余 40%。绝不在最后一个时间线项目下方留下大片空白。
+- **图表容器：** 最小为父容器宽度的 60%，最小高度 300px（仪表盘 360px+）。网格布局中图表应使用 `flex-grow: 1` 填满可用空间 —— 300px 是下限，不是目标。
+- **统计数字：** 最小字号 2rem（32px），bold/extrabold 字重
+- **卡片内容区：** 最小内边距 24px
+- **区块间距：** **主要区块之间强制最小 48px** —— 在 section 元素上使用 `margin-bottom: 48px` 或更大
+- **幻灯片标题：** 最小 2rem（32px），最多 6 个单词
+- **正文文字：** 最小 1rem（16px），绝不更小
 
-**If content feels too small, it IS too small. Err on the side of larger.**
+**如果内容感觉太小，那它就是太小。宁可偏大。**
 
-## Text Visibility Rules
+## 文字可见性规则
 
-**Text must ALWAYS be visible.** This is the #1 cause of broken outputs.
+**文字必须始终可见。** 这是输出损坏的头号原因。
 
-- Dark theme: text MUST use `var(--text)` which resolves to `#f9fafb` (near-white)
-- Light theme: text MUST use `var(--text)` which resolves to `#0f172a` (near-black)
-- On gradient backgrounds: add `text-shadow: 0 1px 3px rgba(0,0,0,0.3)` for readability
-- On hero slides with gradient/image backgrounds: use a dark overlay (`rgba(0,0,0,0.5)`)
-- NEVER set text color to a value close to the background color
-- Test mentally: "would this text be visible on BOTH dark (#030712) and light (#f8fafc) backgrounds?"
+- 深色主题：文字必须使用解析为 `#f9fafb`（近白）的 `var(--text)`
+- 浅色主题：文字必须使用解析为 `#0f172a`（近黑）的 `var(--text)`
+- 渐变背景上：添加 `text-shadow: 0 1px 3px rgba(0,0,0,0.3)` 提升可读性
+- 带渐变/图片背景的主视觉幻灯片上：使用深色遮罩（`rgba(0,0,0,0.5)`）
+- 绝不将文字颜色设置为接近背景色的值
+- 脑中预演测试："这段文字在深色（#030712）和浅色（#f8fafc）背景上都可见吗？"
+## Chart.js 集成规则（关键 —— 最常见的失败点）
 
-## Chart.js Integration Rules (CRITICAL — MOST COMMON FAILURE)
+图表是第二常见的失败点。以下规则对每个图表都是强制的：
 
-Charts are the second most common failure. These rules are MANDATORY for every chart:
-
-### 1. Container Structure (REQUIRED)
+### 1. 容器结构（必需）
 ```html
 <!-- MANDATORY PATTERN FOR EVERY CHART -->
 <div role="img" aria-label="Detailed description of chart data and insights">
@@ -602,13 +598,13 @@ Charts are the second most common failure. These rules are MANDATORY for every c
 </div>
 ```
 
-### 2. Canvas Dimensions (REQUIRED)
-- **Container must have explicit height:** minimum 360px for dashboards, 300px for other types
-- **Canvas element needs no sizing** — Chart.js handles this when `maintainAspectRatio: false`
-- **Container padding:** 40px internal padding for professional spacing
-- **Container border-radius:** 12px for modern card appearance
+### 2. 画布尺寸（必需）
+- **容器必须有显式高度：** 仪表盘最小 360px，其他类型最小 300px
+- **canvas 元素无需设置尺寸** —— 设置 `maintainAspectRatio: false` 时由 Chart.js 处理
+- **容器内边距：** 40px 内边距以呈现专业间距
+- **容器圆角：** 12px 以呈现现代卡片外观
 
-### 3. Chart.js Initialization (MANDATORY PATTERN)
+### 3. Chart.js 初始化（强制模式）
 ```javascript
 // REQUIRED: Chart destruction and canvas reset to prevent "Canvas already in use" errors
 var chartsBuilt = false; // Guard flag
@@ -664,7 +660,7 @@ function onThemeChange() {
   setTimeout(buildCharts, 100); // Slight delay for CSS variable updates
 }
 ```
-- **MANDATORY: Hover tooltips enabled** — never disable Chart.js tooltips:
+- **强制：启用悬停 tooltip** —— 绝不禁用 Chart.js tooltip：
   ```javascript
   options: {
     plugins: {
@@ -676,22 +672,22 @@ function onThemeChange() {
     }
   }
   ```
-- **Minimum chart height:** 300px on desktop, 250px on mobile
-- **Font size defaults:** Axis tick labels at 13px minimum, axis titles at 14px, chart titles at 16px minimum. Legend at 13px.
-- **Chart padding:** Add `layout: { padding: { top: 20, right: 20, bottom: 20, left: 20 } }` for breathing room
-- **Axis tick config:** `maxRotation: 0` to keep labels horizontal. If labels overflow, use `maxTicksLimit` to reduce count
-- **Grid lines:** Very faint — `rgba(255,255,255,0.04)` in dark, `rgba(0,0,0,0.06)` in light
-- **Tooltip styling:** `padding: 12`, `cornerRadius: 8`, `titleFont: { size: 14 }`, `bodyFont: { size: 13 }`
-- **Point radius:** 0 by default, 6 on hover — cleaner line charts
-- **Set `maintainAspectRatio: false`** and control size via CSS container
-- **Use theme-aware colors:** read CSS vars at render time, re-render on theme change
-- **Chart text colors:** set `Chart.defaults.color = getComputedStyle(root).getPropertyValue('--text-secondary').trim()`
-- **Grid line colors:** use `var(--border)` value
-- **Legend position:** 'top' for horizontal charts, 'right' for vertical with space
-- **Axis labels:** Keep horizontal when possible - avoid rotation unless absolutely necessary
-- **Donut/pie charts:** Always include percentage labels on segments
-- **Responsive:** `responsive: true` is default, but container must have explicit dimensions
-- **High contrast colors:** Ensure sufficient color difference between data series for accessibility
+- **图表最小高度：** 桌面端 300px，移动端 250px
+- **字号默认值：** 坐标轴刻度标签最小 13px，轴标题 14px，图表标题最小 16px。图例 13px。
+- **图表内边距：** 添加 `layout: { padding: { top: 20, right: 20, bottom: 20, left: 20 } }` 留出呼吸空间
+- **轴刻度配置：** 用 `maxRotation: 0` 保持标签水平。若标签溢出，用 `maxTicksLimit` 减少数量
+- **网格线：** 非常淡 —— 深色下 `rgba(255,255,255,0.04)`，浅色下 `rgba(0,0,0,0.06)`
+- **tooltip 样式：** `padding: 12`、`cornerRadius: 8`、`titleFont: { size: 14 }`、`bodyFont: { size: 13 }`
+- **点半径：** 默认 0，悬停时 6 —— 折线图更简洁
+- **设置 `maintainAspectRatio: false`**，通过 CSS 容器控制尺寸
+- **使用主题感知颜色：** 渲染时读取 CSS 变量，主题变化时重新渲染
+- **图表文字颜色：** 设置 `Chart.defaults.color = getComputedStyle(root).getPropertyValue('--text-secondary').trim()`
+- **网格线颜色：** 使用 `var(--border)` 的值
+- **图例位置：** 横向图表用 'top'，有空间的纵向图表用 'right'
+- **轴标签：** 尽可能保持水平 —— 除非绝对必要，避免旋转
+- **环形图/饼图：** 始终在各分段上包含百分比标签
+- **响应式：** `responsive: true` 是默认值，但容器必须有显式尺寸
+- **高对比度颜色：** 确保各数据系列之间有足够的色差以满足无障碍要求
 
 ```javascript
 // Theme-aware Chart.js setup (include in every chart visualization)
@@ -741,10 +737,10 @@ function buildCharts() {
 }
 ```
 
-## Critical Debugging Patterns
+## 关键调试模式
 
-### Counter Animation Debug Pattern
-If KPI values show "0%" instead of animating, add this debug pattern:
+### 计数器动画调试模式
+如果 KPI 数值显示 "0%" 而不动画，添加以下调试模式：
 ```javascript
 // DEBUG: Add after counter observer setup to verify intersection
 var counterEl = document.querySelector('[data-count]');
@@ -766,8 +762,8 @@ if (counterEl) {
 }
 ```
 
-### Chart.js Integration Safety Pattern
-MANDATORY for all Chart.js usage to prevent console errors:
+### Chart.js 集成安全模式
+所有 Chart.js 用法都必须遵循，以防止控制台报错：
 ```javascript
 // STEP 1: Global variables - MUST use var, never let/const
 var chartsBuilt = false;
@@ -839,8 +835,8 @@ function onThemeChange() {
 }
 ```
 
-### Menu Outside-Click Fix
-Ensure menu closes when clicking outside by strengthening the event handler:
+### 菜单外部点击修复
+通过强化事件处理器，确保点击外部时菜单关闭：
 ```javascript
 document.addEventListener('click', function(e) { 
   var menu = document.querySelector('.viz-menu');
@@ -851,33 +847,33 @@ document.addEventListener('click', function(e) {
 });
 ```
 
-## Process
+## 流程
 
-1. **Understand** — what's the message? Who's the audience? What format fits?
-2. **Start from skeleton** — copy the Mandatory HTML Skeleton above. NEVER start from a blank file.
-3. **Structure** — outline content/sections BEFORE filling in the skeleton
-4. **Build** — add content, charts, styles. Keep all colors as CSS vars.
-5. **Verify checklist:**
-   - [ ] `html.theme-dark` and `html.theme-light` class-based theme selectors (NO @media prefers-color-scheme)?
-   - [ ] JS detects OS preference on first visit, stores in localStorage?
-   - [ ] All text uses `var(--text)` or `var(--text-secondary)`?
-   - [ ] `@media print` hides menu, shows all content?
-   - [ ] `@media (prefers-reduced-motion: reduce)` present?
-   - [ ] `.viz-menu` with toggle, theme, download, print?
-   - [ ] Correct font loaded? (Inter default, Noto Sans KR for Korean, etc.)
-   - [ ] Non-Latin content has appropriate CJK/RTL font?
-   - [ ] Entrance animations via `.animate` classes (CSS @keyframes)?
-   - [ ] Scroll sections use `data-reveal` (visible without JS)?
-   - [ ] `.card:hover` has transform effect?
-   - [ ] All top-level JS variables use `var` (not `let`/`const`)?
-   - [ ] Charts use `var` declarations + `onThemeChange` hook?
-   - [ ] **MANDATORY:** All charts wrapped with `role="img" aria-label="..."`?
-   - [ ] **MANDATORY:** All charts have hover tooltips enabled (never disabled)?
-   - [ ] Animated number counters use `data-count` where stats exist?
-   - [ ] Semantic HTML: `<main>`, `<section>`, `<header>`, `<article>`?
-   - [ ] All charts have explicit container sizing (≥300px height)?
-   - [ ] Hero/title text visible on both themes?
-   - [ ] Minimum sizing rules followed (cards 280px+, text 16px+)?
-   - [ ] Zero console errors on load?
+1. **理解** —— 要传达什么信息？受众是谁？什么形式合适？
+2. **从骨架开始** —— 复制上面的强制 HTML 骨架。绝不从空白文件开始。
+3. **结构** —— 在填充骨架之前先列出内容/区块大纲
+4. **构建** —— 添加内容、图表、样式。所有颜色保持为 CSS 变量。
+5. **验证清单：**
+   - [ ] `html.theme-dark` 和 `html.theme-light` 基于类的主题选择器（不用 @media prefers-color-scheme）？
+   - [ ] JS 在首次访问时检测操作系统偏好并存入 localStorage？
+   - [ ] 所有文字使用 `var(--text)` 或 `var(--text-secondary)`？
+   - [ ] `@media print` 隐藏菜单、显示全部内容？
+   - [ ] 存在 `@media (prefers-reduced-motion: reduce)`？
+   - [ ] `.viz-menu` 带开关、主题、下载、打印？
+   - [ ] 加载了正确的字体？（默认 Inter，韩文用 Noto Sans KR 等）
+   - [ ] 非拉丁文内容有合适的 CJK/RTL 字体？
+   - [ ] 通过 `.animate` 类（CSS @keyframes）实现入场动画？
+   - [ ] 滚动区块使用 `data-reveal`（无 JS 时内容可见）？
+   - [ ] `.card:hover` 有 transform 效果？
+   - [ ] 所有顶层 JS 变量使用 `var`（而非 `let`/`const`）？
+   - [ ] 图表使用 `var` 声明 + `onThemeChange` 钩子？
+   - [ ] **强制：** 所有图表都包裹了 `role="img" aria-label="..."`？
+   - [ ] **强制：** 所有图表都启用了悬停 tooltip（绝不禁用）？
+   - [ ] 有统计数据的地方使用 `data-count` 实现数字计数动画？
+   - [ ] 语义化 HTML：`<main>`、`<section>`、`<header>`、`<article>`？
+   - [ ] 所有图表都有显式的容器尺寸（高度 ≥300px）？
+   - [ ] 主视觉/标题文字在两种主题下都可见？
+   - [ ] 遵循了最小尺寸规则（卡片 280px+、文字 16px+）？
+   - [ ] 加载时控制台零报错？
 
-The quality bar: **"good, period"** — not "good for AI-generated."
+质量标准：**"就是好"** —— 而不是 "作为 AI 生成的来说还不错"。
