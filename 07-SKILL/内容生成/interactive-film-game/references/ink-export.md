@@ -1,6 +1,6 @@
 # ink 导出规范（源自原项目 lib/persistence.ts exportInk）
 
-最终交付可选输出 Inkle ink 脚本（.ink 文本），规则如下：
+最终交付必须输出 Inkle ink 脚本（story.ink），规则如下：
 
 ## 变量声明
 

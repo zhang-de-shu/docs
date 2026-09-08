@@ -5,7 +5,7 @@ description: 互动影游（互动短剧/漫剧/互动剧）全流程创作技�
 
 ## 定位
 
-面向编剧和互动叙事设计师的全流程创作技能。将互动影游创作拆解为 **5 个阶段**，每阶段有独立方法论与明确的完成标准；AI 承担生成、审查、精修等重复劳动，创作者对每一步产出保有确认、修改、否决权。
+面向编剧和互动叙事设计师的全流程创作技能。将互动影游创作拆解为 **4 个阶段**，每阶段有独立方法论与明确的完成标准；AI 承担生成、审查、精修等重复劳动，创作者对每一步产出保有确认、修改、否决权。
 
 ## 核心理念
 
@@ -29,14 +29,29 @@ description: 互动影游（互动短剧/漫剧/互动剧）全流程创作技�
 
 | 阶段 | 子技能目录 | 产出 |
 |------|-----------|------|
-| 一、世界锚点与规模规划 | `references/01-world-anchor/` | 世界设定 + 角色（四维心理模型）+ 变量 + 结局设计 + 体量方案 |
-| 二、结构与分支 | `references/02-structure-branches/` | 章→幕→节点骨架 + 分支拓扑 + 玩家选项 |
-| 三、场景工坊 | `references/03-workshop/` | 逐节点情感弧、对白、选项精修 |
-| 四、全局校验 | `references/04-validation/` | 校验报告 + 导演终审 + 定向修复 + 导出 |
+| 一、世界锚点与规模规划 | `references/01-world-anchor.md` | 世界设定 + 角色（四维心理模型）+ 变量 + 结局设计 + 体量方案 |
+| 二、结构与分支 | `references/02-structure-branches.md` | 章→幕→节点骨架 + 分支拓扑 + 玩家选项 |
+| 三、场景工坊 | `references/03-workshop.md` | 逐节点情感弧、对白、选项精修 |
+| 四、全局校验 | `references/04-validation.md` | 校验报告 + 导演终审 + 定向修复 + 导出（剧本.md / project.json / story.ink） |
+
+## 项目文件（开工第一步）
+
+收到创作需求并补齐「世界基础设定输入」后，**立即**创建项目输出目录并落盘初始文件，之后再进入阶段一生成：
+
+```
+<工作目录>/interactive-film-game-<项目名>/
+├── project.json   # 事实来源，按 references/data-model.md 结构，随每阶段产出增量更新
+├── 剧本.md        # 阶段四导出
+└── story.ink      # 阶段四导出（必须生成）
+```
+
+- `project.json` 是贯穿全程的**磁盘文件**，不是内存对象：每阶段经用户确认的字段立即写入/合并进该文件（阶段一写 worldAnchor/characters/variables/endingsDesign/scalePlan，阶段二写 chapters/acts/nodes，阶段三写对白与精修，阶段四写 lastValidation/directorReview）。
+- 用户否决或要求修改时，改完重新写入文件后再继续。
+- 后续所有脚本调用（build-skeleton / build-topology / validate / export）都以这个文件路径为输入。
 
 ## 输出约定
 
-- 全程维护一个符合 `references/data-model.md` 的项目JSON文件，最终以 Markdown 剧本 + 完整 JSON（可选 ink 文本）交付。
+- 最终交付物固定为三件：**`剧本.md`（Markdown 剧本）+ `project.json`（完整 JSON）+ `story.ink`（必须生成，按 `references/ink-export.md` 规范）**。ink 不是可选项，缺 ink 即任务未完成。
 - 交付剧本按「章 → 幕 → 节点」组织，每个节点含：场景头、场景描述（摄影机语言）、对白（说话人/台词/情绪）、玩家选项（文字/条件/变量效果/后果）。
 - 变量一律使用 0-10 小整数量表（`name+1` 累积写法），禁止百分比。
 

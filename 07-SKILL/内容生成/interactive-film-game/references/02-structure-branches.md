@@ -57,4 +57,4 @@
 
 ## 产物
 
-写入 `chapters` / `acts` / `nodes`（含 choices、exploreReturnNodeId），结局定义导入时为中途 BE 自动生成 bad 类型定义。结构见 `../../references/data-model.md`。确认后进入阶段三。
+写入 `chapters` / `acts` / `nodes`（含 choices、exploreReturnNodeId），结局定义导入时为中途 BE 自动生成 bad 类型定义——**确认后立即合并写入项目目录的 `project.json`**。结构见 `../../references/data-model.md`。确认后进入阶段三。

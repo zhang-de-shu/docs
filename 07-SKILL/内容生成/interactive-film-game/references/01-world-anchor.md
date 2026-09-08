@@ -61,4 +61,4 @@
 
 ## 产物
 
-项目JSON文件 的 `worldAnchor` / `characters` / `variables` / `endingsDesign` / `scalePlan` 字段。向用户展示后确认，方可进入阶段二（结构与分支）。
+`worldAnchor` / `characters` / `variables` / `endingsDesign` / `scalePlan` 字段——**确认后立即写入项目目录的 `project.json`**（已含其他阶段字段则合并写入）。向用户展示后确认，方可进入阶段二（结构与分支）。

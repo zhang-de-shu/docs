@@ -63,4 +63,4 @@
 
 ## 产物
 
-节点 `emotionFunction` / `sceneDesc` / `dialogue` 写入 Project；选项修订同步回 `choices`。结构见 `../../references/data-model.md`。确认后进入阶段四。
+节点 `emotionFunction` / `sceneDesc` / `dialogue` 写入 Project；选项修订同步回 `choices`——**本阶段每完成一批节点的精修即合并写回项目目录的 `project.json`**（防止中途丢失，最终确认后文件即完整版）。结构见 `../../references/data-model.md`。确认后进入阶段四。

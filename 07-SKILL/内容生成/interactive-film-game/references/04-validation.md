@@ -32,14 +32,15 @@
 
 4. **定向修复**：按阶段二第 4 步（structure:targeted_fix）生成节点级补丁——只补不改写，已填对白不得清空；逐项采纳后**重跑校验脚本**，展示通过率前后对比。
 
-5. **导出交付**：导出由脚本完成：
+5. **导出交付**：导出由脚本完成，**必须加 `--ink`**（三件交付物缺一不可）：
     ```bash
-    alink scripts/export.js <项目JSON路径> <输出目录> [--ink]
+    alink scripts/export.js <项目JSON路径> <输出目录> --ink
     ```
     - **Markdown 剧本**（`剧本.md`）：按 章 → 幕 → 节点 组织，每节点含场景头、场景描述、对白（说话人：台词）、玩家选项（含条件与变量效果标注）；BE 节点单独标注。
     - **JSON**（`project.json`）：完整 Project 数据（`../../references/data-model.md` 结构，事实来源）。
-    - **ink**（`story.ink`，加 `--ink`）：按 `../../references/ink-export.md` 规范产出（VAR 声明自洽、条件结构保留、变量名净化）。
+    - **ink**（`story.ink`，**必须生成**）：按 `../../references/ink-export.md` 规范产出（VAR 声明自洽、条件结构保留、变量名净化）。
+    - 导出完成后核对输出目录中三个文件（剧本.md / project.json / story.ink）均存在且非空；缺任何一件视为未完成，补齐后再向用户交付。
 
 ## 产物
 
-`lastValidation` / `directorReview` 写入 Project；最终剧本与导出文件交付用户，报告剩余未修复项（如有）。
+`lastValidation` / `directorReview` 写入 project.json；输出目录中的 `剧本.md`、`project.json`、`story.ink` 三件交付用户，报告剩余未修复项（如有）。
