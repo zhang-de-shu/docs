@@ -1,0 +1,8 @@
+{
+  "chapters": {"1": {"title": "第一章：风暴之夜"}},
+  "titles": {"c1n1": {"title": "雨夜来电", "notes": "开场：主角接到匿名电话"}},
+  "ops": [
+    {"op": "update_node", "target": {"nodeId": "c1n2"}, "patch": {"notes": "补充：铺垫电话来源"}, "reason": "测试 update_node"},
+    {"op": "add_node", "target": {"nodeId": "c1n2"}, "node": {"title": "插入的过渡节", "type": "normal", "notes": "承接来电，通向出门决定"}, "reason": "测试 add_node"}
+  ]
+}
