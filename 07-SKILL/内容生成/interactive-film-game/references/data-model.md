@@ -7,8 +7,8 @@
 ```
 Project
 ├── title: string
-├── worldAnchor: WorldAnchor
-├── characters: Character[]
+├── storyFramework: StoryFramework（阶段一由用户种子直接生成的故事线框架）
+├── characters: Character[]（可选：仅需主角 fatalFlaw；完整角色卡按需产出）
 ├── scalePlan: ScalePlan（选中的规模方案，仅此一套，不再保留多套备选）
 ├── chapters: Chapter[]
 ├── nodes: StoryNode[]
@@ -21,9 +21,18 @@ Project
 └── aiMode: 'fast' | 'thinking'
 ```
 
-**结构分层**：章 → 小节（StoryNode）两级，没有幕这一层；导出与校验均按 章→节点 处理。
+**结构分层**：章 → 幕/场（Scene）→ 小节（StoryNode）三级；导出与校验均按 章→节点 处理，场层为内容组织与美术服务。
 
-## WorldAnchor（阶段一产出）
+## StoryFramework（阶段一产出：由用户种子直接生成，不再有独立的世界观/规则问卷）
+
+- `storyCore` 故事核心（从用户输入提炼，必须包含"主角想要什么 + 什么在阻碍"的张力）
+- `theme` 核心主题、`genre` 类型/风格、`worldRules` 世界规则（一句话级别，服务于选择，不做设定集）
+- `durationMinutes` 目标时长（分钟，**单路径口径**；素材总量约为单路径的 3-5 倍）
+- `endingCount` 结局数量
+- `endingsDesign: EndingDesign[]`（每个结局标注对应章节/幕：`chapter` 字段）
+- `scalePlan.chapters[].scenes[]`：每章几幕、每幕内容（title + brief）
+
+## Character（四维心理模型 + 声纹卡，可选）
 
 - `storyCore` 故事核心（必须包含"主角想要什么 + 什么在阻碍"的张力）
 - `theme` 核心主题
@@ -80,12 +89,29 @@ Project
 
 - Chapter：`title`、`order`
 
+## Scene（幕/场：一段连续时空，章与节点之间的内容层）
+
+- `sceneId`（`c{章}s{序}`）、`chapterOrder`、`nodeIds: string[]`（本场覆盖的节点，按顺序；节点 100% 归场，不重叠）
+- 划场依据（满足其一即切场）：地点变化 / 显著时间流逝 / 在场人物名单变化 / 道具状态关键改变；每章通常 4-8 场
+- `location`、`time_weather`（时间点+天气/光源+流逝感）
+- `environment`：环境与空间布局（80-150 字，只写可画内容）——**真实感第一铁律**：五感至少跨三感、空间被功能塑形、允许损耗与不一致、细节可反推住民及处境
+- `key_props: string[]`：叙事性道具及**状态**（半盏冷茶、断刀出鞘）；跨场流转必须交代去向
+- `characters_present: string[]`：在场人物及进场姿态；不在名单上的人物不得在本场开口
+- `art_prompt`：可直接喂给 AI 画图/视频生成的提示词（写实向；同章风格前缀一致；同一空间复用时主体不变只变状态层）
+
 ## StoryNode（核心叙事单元 = 小节）
 
 - `id`（`c{章}n{序}`，如 `c1n3`）、`title`、`order`、`notes`（创作备注/骨架意图）
 - `type`：`start` 开场（唯一）/ `normal` 主线推进 / `branch` 关键选择点（含即死 BE 岔口）/ `merge` 多路径汇回主线 / `explore` 可选旁支 / `ending` 结局（含非终章即死 BE）
+- `sceneId`（所属场，`c{章}s{序}`，如 `c1s1`）；`entryState` 进入状态（承接上一拍）/ `exitState` 离场变化（喂给下一拍）
 - `sceneHeader`：`location` / `timeOfDay`（DAY/NIGHT/DAWN/DUSK/CONTINUOUS）/ `interior`（INT/EXT/INT/EXT）
 - `sceneDesc` 场景描述（摄影机语言：只写可见的动作与空间细节）
+- `narrative`：叙事文本（150-400 字散文体）：环境感官 + 人物举止表情 + 情节推进织进叙述流，对白嵌在叙事中；节点连读应为连续故事
+- `dialogue: DialogueLine[]`：`speaker` / `text` / `emotion`；可选 `action`（行为细节，若该行行为未在 narrative 中体现则必填）
+- `monologue: MonologueLine[]` 内心独白（**按需，不设配额**，全剧总量约为节点数 30-50%）：
+    - `place`：`opening`（信息差开场）/ `pre_choice`（选项前两难定格）/ `close`（BE/ending 收束）
+    - `text`：第一人称现在时口语，单句 ≤30 字；不复述对白
+    - `variant`：空 = 默认版；`stance-quick` / `stance-proof` 等按立场类变量区分
 - `emotionFunction`：`emotionIn` / `emotionOut` / `playerEmotion` / `tension`(0-10) / `internal_lie` / `fear`
 - `dialogue: DialogueLine[]`：`speaker` / `text` / `emotion`
 - `choices: Choice[]`

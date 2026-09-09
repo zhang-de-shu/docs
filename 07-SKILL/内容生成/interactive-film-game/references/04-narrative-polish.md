@@ -1,0 +1,36 @@
+# 阶段四：叙事化润色（narrative polish）
+
+对每个节点做叙事化润色和丰富：把骨架阶段的 title/notes 变成**读起来像故事的内容**。结构与闭环已在阶段三锁死，本阶段不改结构（节点/拓扑/选项指向一律不动），只充实内容。
+
+## 分层模型
+
+```
+章（叙事单元）
+ └─ 场（scene = 一段连续时空，1-N 个节点；背景唯一载体）
+     └─ 节点（一段完整的故事：narrative 叙事文本，对白嵌在其中，独白按需）
+```
+
+- **场是背景的唯一载体**：environment / time_weather / key_props / characters_present / art_prompt 定义在场上，节点通过 sceneId 引用，禁止在节点级重复描述环境。
+- **节点是一段完整的故事**：`narrative`（150-400 字散文体）把环境感官、人物举止表情、情节推进织进叙述流，对白嵌在叙事里（禁止裸对白列表）；进入状态（承接上场）→ 本拍冲突 → 收在未解决处。同场节点靠 entryState/exitState 缝合，连读应成连续的故事。
+- **真实感原则**（写进叙述，不是检查项）：环境"被人真实使用过"——五感跨三感以上、空间被功能塑形、有损耗与不一致、细节能反推住民处境；人物的企图同时用叙述里的行为体现。
+- **对白质量**（写进叙事的标准，非检查关卡）：每句台词是战术行为（迂回达到目的）；权力至少转移一次；至少一人说反话；角色声音节奏可区分；禁止直陈情绪（情绪在行为细节里）；结尾留钩不留闭合。
+- **独白按需，不设配额**：只在三种时刻写——①信息差输送 ②lie 被戳破的动摇 ③选项前两难定格。全剧约为节点数的 30-50%；不写独白常常就是正确答案。
+
+## 工作步骤
+
+1. **场背景充实**：为每场补齐 environment（真实感）/ time_weather / key_props（含跨场流转）/ art_prompt（同章风格前缀一致）。
+2. **逐节点润色**：每节点产出 narrative（嵌入对白 6-10 行）+ 按需 monologue + emotionFunction（emotionIn/out、playerEmotion、tension、internal_lie、fear）+ entryState/exitState；回响读取节点的对白/叙述必须兑现早前 Flag（道具状态同步更新到场 key_props）。
+3. **内容落盘**：经 fill-nodes.js 分批合并写入 project.json，防止丢失。
+4. **导出交付**（必须加 `--ink`，三件缺一不可）：
+   ```bash
+   node scripts/export.js <项目JSON路径> <输出目录> --ink
+   ```
+   - `剧本.md`：按 章→场→节点 组织，节点含叙事文本、对白（说话人：台词）、玩家选项（含条件与变量标注）；BE 节点单独标注。
+   - `project.json`：完整数据。
+   - `story.ink`：ink 脚本（VAR 声明自洽、条件结构保留、变量名净化）。
+   - 核对三个文件存在且非空。
+5. **收尾复验**：内容润色不应动结构，但仍复跑一次 validate.js 确认 error 仍为 0（防止误改 targetNodeId/conditions），然后交付。
+
+## 产物
+
+场背景 + 节点 narrative/dialogue/monologue/emotionFunction 写入 project.json；输出目录中的 `剧本.md`、`project.json`、`story.ink` 三件交付用户。
