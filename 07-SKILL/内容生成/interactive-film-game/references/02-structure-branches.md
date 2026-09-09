@@ -1,10 +1,10 @@
 # 阶段二：结构与分支（structure / branches）
 
-按 章 → 幕 → 节点 三级层级搭建叙事骨架，并生成节点间选项连接（含条件与变量效果）。开始前必读 `../../references/domain-baseline.md`（体验守则与结构范式）。
+按 **章 → 节点 两级**层级搭建叙事骨架，并生成节点间选项连接（含条件与变量效果）。开始前必读 `domain-baseline.md`（体验守则与结构范式）。
 
 ## 完成标准
 
-- 全部章节骨架生成完毕，节点类型分布满足：每章 ≥1 中段分支、非终章每章 1-2 个即死 BE 岔口、全片 branch 占比 ≥25%、每幕 ≥4 节点。
+- 全部章节骨架生成完毕，节点类型分布满足：每章 ≥1 中段分支、每章 4-8 个即死 BE 岔口（占选择节点 20-30%，第 1 章内必须出现首个即死 BE 完成选择教学）、全片 branch 占比 ≥25%。
 - 全部非 ending 节点有玩家选项；带条件选项的节点均有无条件保底出口。
 - 阶段四的校验脚本（`scripts/validate.js`）对已生成部分无 error 级问题。
 
@@ -18,14 +18,11 @@
     - 输出模版：{"throughlines":["叙事线1","叙事线2"],"chapter_handoffs":[{"from":1,"to":2,"carry_over":"进入第2章时主角的关键处境"}],"character_arcs":{"角色名":["第1章状态","第2章状态"]}}
 
 2. **逐章骨架（structure:chapter）**：骨架槽位、type、节点 id 全部由脚本计算并直接写入 project.json，AI 不做任何结构计算。每章执行：
-    ```bash
-    alink scripts/build-skeleton.js <项目JSON路径> <章序号(从1起)> --write
-    ```
-    脚本把该章骨架（章节/幕记录、acts/nodes 槽位、type、占位 title/notes）直接合并写入 project.json（幂等：重跑只替换本章，不碰其他章），stdout 打印骨架 JSON + 硬约束摘要（目标节点数、逐幕数量、承接 handoff、本章位置）。AI 的填充只有一件事：按 stdout 骨架写好各节点的 title/notes，通过 fill-nodes.js 落盘：
+    脚本把该章骨架（章节记录与 nodes 槽位、type、占位 title/notes）直接合并写入 project.json（幂等：重跑只替换本章，不碰其他章），stdout 打印骨架 JSON + 硬约束摘要（目标节点数、承接 handoff、本章位置）。AI 的填充只有一件事：按 stdout 骨架写好各节点与各章的 title/notes，通过 fill-nodes.js 落盘：
     ```bash
     alink scripts/fill-nodes.js <项目JSON路径> <填充JSON路径>
     ```
-    填充 JSON 格式：{"chapters":{"<章order>":{"title":"..."}},"acts":{"<actId如c1a1>":{"title":"..."}},"titles":{"<nodeId>":{"title":"...","notes":"..."}}}（nodeId/actId 从脚本输出原样复制；占位符「第X章：章名」「第X幕：幕名」「节点名」必须全部替换）。填充约束：节点数量/顺序/type 不可更改，仅替换 title/notes；merge 节点必须保留；严禁将 branch 降为 normal；中途 ending（即死 BE）不得改 type、删除或当笔误"修正"。
+    填充 JSON 格式：{"chapters":{"<章order>":{"title":"..."}},"titles":{"<nodeId>":{"title":"...","notes":"..."}}}（nodeId 从脚本输出原样复制；占位符「第X章：章名」「节点名」必须全部替换）。填充约束：节点数量/顺序/type 不可更改，仅替换 title/notes；merge 节点必须保留；严禁将 branch 降为 normal；中途 ending（即死 BE）不得改 type、删除或当笔误"修正"。
     脚本自动应用全部结构规则，输出即最终骨架，无需也不得推演其内部规则。章节可并行填充（共用骨干上下文），单章失败单独重试。
 
 3. **分支拓扑与玩家选项（branches:generate）**：连接拓扑由脚本推导并写入 project.json（project.topology），AI 按拓扑逐节点写选项文字。执行：
@@ -37,7 +34,7 @@
         - 菱形分支（branch/diamond）：每个选项指向不同专属路径节点，variableEffects 必须写出影响（如 `affection_A+1`），且各路径尽量使用不同变量（路径 A `courage+1`、路径 B `trust+1`），终章门控才能区分路线；choiceWeight="heavy"。
         - 变量积累型（branch/variable）：2-3 个选项，targetNodeId 相同，variableEffects 各不同，choiceWeight="heavy"。
         - 路线门控（branch/route）与终章直通（branch/terminal）：conditions 必须用对应结局的 keyVariable，阈值为 0-10 量表下 3-6 的整数（如 `courage>=4`），禁止百分比或自造变量，choiceWeight="critical"。
-        - BE 选项：文案必须有吸引力/危险诱惑、不能一眼看出死路，且不写 variableEffects（选中即死）。
+        - BE 选项：文案必须有吸引力/危险诱惑、不能一眼看出死路，且不写 variableEffects（选中即终结这条路线）。
         - start：1 个推进选项（light）；merge：1 个推进选项（light）；explore：choices=[] 只填 exploreReturnNodeId。
         - 所有 targetNodeId 从拓扑直接复制，禁止捏造或修改。
     - 校验规则前置对齐（生成时必须遵守，否则本地校验直接标红）：
@@ -68,4 +65,4 @@
 
 ## 产物
 
-`chapters` / `acts` / `nodes`（含 choices、exploreReturnNodeId）与 `topology` 由脚本 `--write` / fill-nodes.js 直接写入项目目录的 `project.json`（结局定义导入时为中途 BE 自动生成 bad 类型定义）——用户确认后即生效，无需手工搬运。结构见 `../../references/data-model.md`。确认后进入阶段三。
+`chapters` / `nodes`（含 choices、exploreReturnNodeId）与 `topology` 由脚本 `--write` / fill-nodes.js 直接写入项目目录的 `project.json`（结局定义导入时为中途 BE 自动生成 bad 类型定义）——用户确认后即生效，无需手工搬运。结构见 `../../references/data-model.md`。确认后进入阶段三。

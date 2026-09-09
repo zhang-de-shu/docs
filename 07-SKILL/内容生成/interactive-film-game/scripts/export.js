@@ -30,16 +30,23 @@ try {
 const nodes = project.nodes || [];
 const nodeById = new Map(nodes.map(n => [n.id, n]));
 const chapters = project.chapters || [];
-const acts = project.acts || [];
 const endings = project.endings || [];
 
 fs.mkdirSync(outDir, { recursive: true });
 
-// ── Markdown 剧本 ───────────────────────────────────────────────
-const actsByChapter = new Map();
-for (const a of acts) {
-  if (!actsByChapter.has(a.chapterId)) actsByChapter.set(a.chapterId, []);
-  actsByChapter.get(a.chapterId).push(a);
+// ── Markdown 剧本（章 → 节点 两级）─────────────────────────────
+const nodesByChapter = new Map();
+for (const ch of chapters) nodesByChapter.set(ch.id || `order:${ch.order}`, []);
+// 章内节点顺序：按 id 前缀（c{order} → c{order}n*）+ 全局 nodes 顺序
+for (const ch of chapters) {
+  const key = ch.id || `order:${ch.order}`;
+  const ordered = [];
+  const seen = new Set();
+  const prefix = (ch.id || '').replace(/[^a-z0-9]/gi, '') || `c${ch.order}`;
+  for (const n of nodes) {
+    if (String(n.id).startsWith(prefix) && !seen.has(n.id)) { ordered.push(n); seen.add(n.id); }
+  }
+  nodesByChapter.set(key, ordered);
 }
 
 const mdLines = [];
@@ -49,37 +56,35 @@ if (project.worldAnchor?.storyCore) mdLines.push(`> ${project.worldAnchor.storyC
 const sortedChapters = [...chapters].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 for (const ch of sortedChapters) {
   mdLines.push(`## ${ch.title}\n`);
-  for (const act of actsByChapter.get(ch.id) || []) {
-    mdLines.push(`### ${act.title}\n`);
-    const actNodes = (act.nodeIds || []).map(id => nodeById.get(id)).filter(Boolean);
-    for (const n of actNodes) {
-      const beTag = n.type === 'ending' && (endings.find(e => e.nodeId === n.id)?.type === 'bad') ? ' **【BE】**' : '';
-      mdLines.push(`#### ${n.title}${beTag}\n`);
-      if (n.sceneHeader) {
-        const sh = n.sceneHeader;
-        mdLines.push(`**${sh.interior || ''} ${sh.location || ''} — ${sh.timeOfDay || ''}**\n`);
-      }
-      if (n.notes) mdLines.push(`> 创作备注：${n.notes}\n`);
-      if (n.sceneDesc) mdLines.push(`${n.sceneDesc}\n`);
-      for (const d of n.dialogue || []) {
-        mdLines.push(`**${d.speaker}**（${d.emotion || ''}）：${d.text}`);
-      }
-      if ((n.dialogue || []).length) mdLines.push('');
-      for (const c of n.choices || []) {
-        const parts = [];
-        if (c.conditions) parts.push(`条件: ${c.conditions}`);
-        if (c.variableEffects) parts.push(`效果: ${c.variableEffects}`);
-        const meta = parts.length ? `（${parts.join('；')}）` : '';
-        const target = nodeById.get(c.targetNodeId);
-        mdLines.push(`- ▶ ${c.text}${meta}${target ? ` → ${target.title}` : ''}`);
-      }
-      if ((n.choices || []).length) mdLines.push('');
-      if (n.type === 'explore' && n.exploreReturnNodeId) {
-        const ret = nodeById.get(n.exploreReturnNodeId);
-        mdLines.push(`- ↩ 探索结束返回${ret ? `：${ret.title}` : ''}\n`);
-      }
-      if (n.durationSeconds) mdLines.push(`*时长约 ${n.durationSeconds} 秒*\n`);
+  const key = ch.id || `order:${ch.order}`;
+  const chNodes = nodesByChapter.get(key) || [];
+  for (const n of chNodes) {
+    const beTag = n.type === 'ending' && (endings.find(e => e.nodeId === n.id)?.type === 'bad') ? ' **【BE】**' : '';
+    mdLines.push(`### ${n.title}${beTag}\n`);
+    if (n.sceneHeader) {
+      const sh = n.sceneHeader;
+      mdLines.push(`**${sh.interior || ''} ${sh.location || ''} — ${sh.timeOfDay || ''}**\n`);
     }
+    if (n.notes) mdLines.push(`> 创作备注：${n.notes}\n`);
+    if (n.sceneDesc) mdLines.push(`${n.sceneDesc}\n`);
+    for (const d of n.dialogue || []) {
+      mdLines.push(`**${d.speaker}**（${d.emotion || ''}）：${d.text}`);
+    }
+    if ((n.dialogue || []).length) mdLines.push('');
+    for (const c of n.choices || []) {
+      const parts = [];
+      if (c.conditions) parts.push(`条件: ${c.conditions}`);
+      if (c.variableEffects) parts.push(`效果: ${c.variableEffects}`);
+      const meta = parts.length ? `（${parts.join('；')}）` : '';
+      const target = nodeById.get(c.targetNodeId);
+      mdLines.push(`- ▶ ${c.text}${meta}${target ? ` → ${target.title}` : ''}`);
+    }
+    if ((n.choices || []).length) mdLines.push('');
+    if (n.type === 'explore' && n.exploreReturnNodeId) {
+      const ret = nodeById.get(n.exploreReturnNodeId);
+      mdLines.push(`- ↩ 探索结束返回${ret ? `：${ret.title}` : ''}\n`);
+    }
+    if (n.durationSeconds) mdLines.push(`*时长约 ${n.durationSeconds} 秒*\n`);
   }
 }
 fs.writeFileSync(path.join(outDir, '剧本.md'), mdLines.join('\n'), 'utf-8');

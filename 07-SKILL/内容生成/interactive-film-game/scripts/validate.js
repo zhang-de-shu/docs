@@ -2,7 +2,7 @@
 /**
  * 互动影游项目本地校验脚本
  * 用法：alink scripts/validate.js <项目JSON路径> [--write]
- * 按 23 项检测（结构完整性 13 + 叙事质量 10）输出 ValidationReport 与通过率。
+ * 按 26 项检测（结构完整性 16 + 叙事质量 10）输出 ValidationReport 与通过率。
  * 通过率 = 100 − error×20 − warning×8 − info×2（下限 0）。
  * 加 --write 时：报告同时写入项目 JSON 的 lastValidation（校验不通过也会写入，便于修复后对比）。
  */
@@ -157,7 +157,7 @@ const maxVar = {};
   }
 })();
 
-// ---------- 结构完整性（13 项）----------
+// ---------- 结构完整性（16 项）----------
 // 1. DEAD_END 死路
 for (const n of nodes) {
   if (n.type === 'ending') continue;
@@ -286,6 +286,68 @@ for (const n of nodes) {
   const cs = choicesOf(n);
   if (cs.length > 0 && cs.every(c => c.conditions && String(c.conditions).trim())) {
     add('warning', 'ALL_CHOICES_GATED', `节点「${n.title}」全部选项都带条件，玩家可能被软锁卡死`, [n.id]);
+  }
+}
+// 14. 终章单点扇出：多个结局节点的直接前置是同一个选择节点（domain-baseline §3）
+{
+  // 每个结局节点：找其直接前置（某节点的选项/出口直接指向它）
+  const endingPredecessors = new Map(); // endingNodeId -> Set(prevNodeId)
+  for (const n of nodes) {
+    for (const t of outEdges(n)) {
+      if (nodeById.get(t)?.type === 'ending') {
+        if (!endingPredecessors.has(t)) endingPredecessors.set(t, new Set());
+        endingPredecessors.get(t).add(n.id);
+      }
+    }
+  }
+  // 判定：某非 ending 节点是 ≥2 个结局的直接前置，且这些结局均无"只属于该路线的专属小节"
+  const endingCountByPrev = new Map();
+  for (const [endId, prevs] of endingPredecessors) {
+    for (const pv of prevs) {
+      if (!endingCountByPrev.has(pv)) endingCountByPrev.set(pv, []);
+      endingCountByPrev.get(pv).push(endId);
+    }
+  }
+  for (const [prevId, endIds] of endingCountByPrev) {
+    if (endIds.length < 2) continue;
+    const prev = nodeById.get(prevId);
+    // 违规判定：该前置节点的选项直接指向 ≥2 个 ending（没有专属场景夹层）
+    const directEndingTargets = outEdges(prev).filter(t => nodeById.get(t)?.type === 'ending');
+    if (directEndingTargets.length >= 2 && prev.type !== 'ending') {
+      add('error', 'ENDING_SINGLE_FANOUT', `节点「${prev.title}」的选项直接通向 ${directEndingTargets.length} 个结局（${directEndingTargets.map(t => nodeById.get(t).title).join('、')}）——终章单点扇出，玩家的全程积累未参与裁决；每个结局前必须有专属前置小节`, [prevId, ...directEndingTargets]);
+    }
+  }
+}
+// 15. BE 密度：每章即死 BE 岔口 4-8 个（第 1 章必须 ≥1 个完成选择教学）
+{
+  const chapOf = (id) => { const m = /^c(\d+)/.exec(String(id)); return m ? Number(m[1]) : null; };
+  const beByChapter = new Map();
+  for (const n of nodes) {
+    if (n.type !== 'branch') continue;
+    const isBE = /即死岔口|改为即死结局/.test((n.title || '') + (n.notes || ''));
+    if (!isBE) continue;
+    const c = chapOf(n.id);
+    if (c === null) continue;
+    beByChapter.set(c, (beByChapter.get(c) || 0) + 1);
+  }
+  if (beByChapter.size > 0) {
+    for (const [c, cnt] of beByChapter) {
+      if (cnt < 4) add('warning', 'BE_DENSITY_LOW', `第${c}章即死 BE 岔口仅 ${cnt} 个（基准 4-8 个，占选择节点 20-30%）——互动密度不足，会退化成"可点击的短剧"`);
+      if (cnt > 8) add('info', 'BE_DENSITY_HIGH', `第${c}章即死 BE 岔口 ${cnt} 个，超过基准上限 8 个，检查是否惩罚过密`);
+    }
+    // 第 1 章：必须有 BE（选择即后果教学）
+    const firstChapterWithNodes = Math.min(...nodes.map(n => chapOf(n.id)).filter(v => v !== null));
+    if (firstChapterWithNodes === 1 && !(beByChapter.get(1) >= 1)) {
+      add('warning', 'NO_FIRST_CHAPTER_BE', '第 1 章没有任何即死 BE 岔口——缺失"选择即后果"教学，玩家不会把后续选择当真');
+    }
+  }
+}
+// 16. normal 推进节点须有 2-3 个真选择（domain-baseline §2.1 选择密度）
+for (const n of nodes) {
+  if (n.type !== 'normal' && n.type !== 'start' && n.type !== 'merge') continue;
+  const cs = choicesOf(n);
+  if (n.type === 'normal' && cs.length === 1) {
+    add('warning', 'SINGLE_FAKE_CHOICE', `normal 节点「${n.title}」仅 1 个选项（"继续"式单选项=伪互动），须 2-3 个真选择（同目标不同语气/变量效果）`, [n.id]);
   }
 }
 

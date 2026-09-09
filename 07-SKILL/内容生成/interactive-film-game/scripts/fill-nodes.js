@@ -9,7 +9,6 @@
  * 填充 JSON（顶层字段全部可选，按需提供；任一校验失败则整批拒绝写入，exit 1）：
  * {
  *   "chapters": { "<章order>": {"title": "..."} },
- *   "acts":     { "<actId如c1a1>": {"title": "..."} },
  *   "titles":   { "<nodeId>": {"title": "...", "notes": "..."} },
  *   "nodeContent": { "<nodeId>": { "sceneHeader": {"location","timeOfDay","interior"},
  *                                  "sceneDesc": "...", "emotionFunction": {...},
@@ -22,7 +21,7 @@
  * }
  *
  * ops 字段说明（定向修复用，只补不改写）：
- * - add_node:        node: {title, type(必填，六类之一), notes, sceneDesc?...}，插入到 target 节点之后（自动分配同幕下一个可用 id，并同步幕记录 nodeIds）
+ * - add_node:        node: {title, type(必填，六类之一), notes, sceneDesc?...}，插入到 target 节点之后（自动分配本章下一个可用 id）
  * - update_node:     patch: {title?, type?, notes?, notesAppend?}（只补/改这些字段，不清空其他内容）
  * - add_choice:      choice: {text, targetNodeId, conditions?, variableEffects?, choiceWeight?, consequence?}（追加到节点选项末尾；
  *                    若该选项带 conditions 且修后节点将没有任何无条件选项 → 拒绝）
@@ -88,17 +87,12 @@ function resolveNode(ref) {
 }
 
 const errors = [];
-const stats = { chapters: 0, acts: 0, titles: 0, nodeContent: 0, choiceNodes: 0, choices: 0, ops: 0 };
+const stats = { chapters: 0, titles: 0, nodeContent: 0, choiceNodes: 0, choices: 0, ops: 0 };
 
 // ── 预校验（任何错误 → 整批拒绝，不写盘）────────────────────────
 for (const [order, patch] of Object.entries(payload.chapters || {})) {
   if (!project.chapters.some(c => Number(c.order) === Number(order))) errors.push(`chapters: 不存在 order=${order} 的章节记录`);
   else if (patch && typeof patch !== 'object') errors.push(`chapters[${order}]: 必须是对象`);
-}
-
-for (const [actId, patch] of Object.entries(payload.acts || {})) {
-  if (!project.chapters.some(c => (c.acts || []).some(a => a.id === actId))) errors.push(`acts: 不存在 id=${actId} 的幕记录`);
-  else if (patch && typeof patch !== 'object') errors.push(`acts[${actId}]: 必须是对象`);
 }
 
 for (const [id, patch] of Object.entries(payload.titles || {})) {
@@ -142,9 +136,6 @@ for (const [ri, req] of (Array.isArray(payload.nodeChoices) ? payload.nodeChoice
 }
 
 // ── ops 预校验 ──────────────────────────────────────────────────
-const actsIndex = new Map(); // actId -> {chapter, act}
-for (const c of project.chapters) for (const a of (c.acts || [])) actsIndex.set(a.id, { chapter: c, act: a });
-
 function checkChoiceShape(prefix, c) {
   if (!c || !String(c.text || '').trim()) errors.push(`${prefix}: 缺 text`);
   if (!c || !c.targetNodeId || !nodeById.has(c.targetNodeId)) errors.push(`${prefix}: targetNodeId "${c && c.targetNodeId}" 不存在`);
@@ -212,11 +203,6 @@ for (const [order, patch] of Object.entries(payload.chapters || {})) {
   if (patch.title !== undefined) c.title = patch.title;
   stats.chapters++;
 }
-for (const [actId, patch] of Object.entries(payload.acts || {})) {
-  const rec = actsIndex.get(actId);
-  if (rec && patch.title !== undefined) rec.act.title = patch.title;
-  stats.acts++;
-}
 for (const [id, patch] of Object.entries(payload.titles || {})) {
   const n = nodeById.get(id);
   if (patch.title !== undefined) n.title = patch.title;
@@ -244,28 +230,32 @@ for (const req of (Array.isArray(payload.nodeChoices) ? payload.nodeChoices : []
 }
 
 // ── ops 应用 ───────────────────────────────────────────────────
-function nextNodeIdInAct(actId) {
+// 章序号取自目标节点 id 前缀（c{n}…）
+function chapterOfNode(n) {
+  const m = /^c(\d+)/.exec(String(n.id || ''));
+  return m ? Number(m[1]) : null;
+}
+function nextNodeIdInChapter(chapterNo) {
   let max = 0;
-  for (const id of actsIndex.get(actId).act.nodeIds || []) {
-    const m = /^c\d+a\d+n(\d+)$/.exec(String(id));
+  const pre = `c${chapterNo}`;
+  for (const n of project.nodes) {
+    const m = new RegExp(`^${pre}n(\\d+)$`).exec(String(n.id));
     if (m) max = Math.max(max, Number(m[1]));
   }
-  return `${actId}n${max + 1}`;
+  return `${pre}n${max + 1}`;
 }
 
 for (const op of (Array.isArray(payload.ops) ? payload.ops : [])) {
   const { node } = resolveNode(op.target);
   if (op.op === 'add_node') {
-    const rec = actsIndex.get(node.actId);
-    const id = nextNodeIdInAct(node.actId);
-    const fresh = { id, actId: node.actId };
+    const chapterNo = chapterOfNode(node) || 1;
+    const id = nextNodeIdInChapter(chapterNo);
+    const fresh = { id };
     for (const k of NODE_FIELDS) if (op.node[k] !== undefined) fresh[k] = op.node[k];
     fresh.type = op.node.type;
-    // 插入到 target 节点之后：全局节点序列 + 幕记录 nodeIds
+    // 插入到 target 节点之后：全局节点序列
     const at = project.nodes.findIndex(x => x.id === node.id);
     project.nodes.splice(at + 1, 0, fresh);
-    const ni = rec.act.nodeIds.indexOf(node.id);
-    rec.act.nodeIds.splice(ni + 1, 0, id);
   } else if (op.op === 'update_node') {
     const p = op.patch || {};
     if (p.title !== undefined) node.title = p.title;
@@ -290,9 +280,9 @@ for (const op of (Array.isArray(payload.ops) ? payload.ops : [])) {
   stats.ops++;
 }
 
-// 幕记录可能因 add_node 改变，重排全局 order
+// add_node 可能改变序列，重排全局 order
 project.nodes.forEach((n, i) => { n.order = i + 1; });
 
 fs.writeFileSync(file, JSON.stringify(project, null, 2) + '\n');
 console.log(JSON.stringify({ ok: true, written: file, ...stats }));
-console.error(`已写入 ${file}：章节标题 ${stats.chapters}、幕标题 ${stats.acts}、节点 title/notes ${stats.titles}、内容节点 ${stats.nodeContent}、选项节点 ${stats.choiceNodes}（共 ${stats.choices} 个选项）、定向修复 ops ${stats.ops}。`);
+console.error(`已写入 ${file}：章节标题 ${stats.chapters}、节点 title/notes ${stats.titles}、内容节点 ${stats.nodeContent}、选项节点 ${stats.choiceNodes}（共 ${stats.choices} 个选项）、定向修复 ops ${stats.ops}。`);
