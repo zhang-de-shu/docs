@@ -12,6 +12,7 @@ Project
 ├── scalePlan: ScalePlan（选中的规模方案，仅此一套，不再保留多套备选）
 ├── chapters: Chapter[] → acts: Act[]（含 nodeIds、戏剧功能）
 ├── nodes: StoryNode[]
+├── topology: { generatedAt, connections, needChoiceNodes }（阶段二 build-topology --write 写入）
 ├── variables: Variable[]
 ├── endings: Ending[]
 ├── lastValidation: ValidationReport

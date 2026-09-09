@@ -12,12 +12,12 @@
 
 1. **本地校验（执行代码）**：本地校验是确定性规则检测，不逐项人工/AI 自查，直接运行脚本：
     ```bash
-    alink scripts/validate.js <项目JSON路径>
+    alink scripts/validate.js <项目JSON路径> --write
     ```
-    脚本执行 23 项检测（结构完整性 13 项 + 叙事质量 10 项，判定规则见脚本内注释），自动遍历节点图与条件表达式，输出 ValidationReport（issues 含 level/code/message/relatedIds）并通过率 = 100 − error×20 − warning×8 − info×2（下限 0）。error > 0 时进程以非零码退出。
+    脚本执行 23 项检测（结构完整性 13 项 + 叙事质量 10 项），自动遍历节点图与条件表达式，输出 ValidationReport（issues 含 level/code/message/relatedIds）并通过率 = 100 − error×20 − warning×8 − info×2（下限 0）；加 `--write` 时报告直接写入 project.json 的 `lastValidation`（校验不通过也会写入，便于修复后对比）。error > 0 时进程以非零码退出。
     - 脚本内置：可达性 BFS 承认 explore 返回边；条件表达式 lint（括号匹配、`varName op value` 子式校验）；软锁检测（变量阈值 > 全图 variableEffects 理论上界 → UNSATISFIABLE_CONDITION）。
     - 脚本失败或 JSON 不符合 `../../references/data-model.md` 结构时报错退出——先修数据，不要跳过校验。
-    - 校验结果写入 Project 的 `lastValidation`。
+    - 校验结果由脚本 `--write` 写入 Project 的 `lastValidation`，不由 AI 手工转录。
 
 2. **自我检查**：校验后用一句话自检——结构问题（死路/断链/不可达）、叙事问题（情感节奏单调/选项重复/结局单一）、可重玩性（分支密度/结局差异）、角色一致性（主要角色是否在主路径都有出场）是否还有遗漏，发现问题直接修正后重跑脚本，无需输出独立的 AI 分析报告。
 

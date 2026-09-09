@@ -47,13 +47,21 @@ description: 互动影游（互动短剧/漫剧/互动剧）全流程创作技�
 
 - `project.json` 是贯穿全程的**磁盘文件**，不是内存对象：每阶段经用户确认的字段立即写入/合并进该文件（阶段一写 worldAnchor/characters/variables/endingsDesign/scalePlan，阶段二写 chapters/acts/nodes，阶段三写对白与精修，阶段四写 lastValidation/directorReview）。
 - 用户否决或要求修改时，改完重新写入文件后再继续。
-- 后续所有脚本调用（build-skeleton / build-topology / validate / export）都以这个文件路径为输入。
+- 后续所有脚本调用（build-skeleton / build-topology / validate / export / fill-nodes）都以这个文件路径为输入；结构性写入由脚本 `--write` 落盘，内容填充与定向修复走 `fill-nodes.js`（见「脚本黑盒契约」）。
 
 ## 输出约定
 
 - 最终交付物固定为三件：**`剧本.md`（Markdown 剧本）+ `project.json`（完整 JSON）+ `story.ink`（必须生成，按 `references/ink-export.md` 规范）**。ink 不是可选项，缺 ink 即任务未完成。
 - 交付剧本按「章 → 幕 → 节点」组织，每个节点含：场景头、场景描述（摄影机语言）、对白（说话人/台词/情绪）、玩家选项（文字/条件/变量效果/后果）。
 - 变量一律使用 0-10 小整数量表（`name+1` 累积写法），禁止百分比。
+
+## 脚本黑盒契约（硬约束）
+
+- `scripts/` 下所有脚本（build-skeleton / build-topology / validate / export / fill-nodes）一律当作黑盒：只允许执行，禁止 read 或解释其源码，禁止在思考中推演、复算或预演其输出。脚本实现与你的工作无关。
+- 脚本 stdout 中的 JSON 是唯一事实：槽位、type、拓扑、nodeId、targetNodeId 一律原样采信与复制，不验证、不"修正"、不凭记忆重写。
+- 自查触发器：若你发现自己在思考中计算节点数、分支配额、阈值可达性或拓扑连接——立即停止推演，改为直接运行脚本。
+- 脚本报错时只有三个动作：把 stderr 原样展示给用户 → 原样重试 1 次 → 仍失败则停下询问用户。不存在第四个动作（尤其不是读源码排查）。
+- 单一事实文件：project.json 是唯一状态载体。结构性写入（骨架、拓扑、校验报告）一律由脚本 `--write` 直接落盘；内容填充（title/notes/choices/对白）与定向修复 ops 一律通过 `fill-nodes.js` 完成，禁止凭对话记忆或思考中的推演重建任何 JSON。
 
 ## 硬约束
 

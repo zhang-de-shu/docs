@@ -2,10 +2,11 @@
 /**
  * 分支拓扑推导脚本（移植自原项目 lib/ai/prompts/branches.ts「branches:generate」第一步）
  *
- * 用法：alink scripts/build-topology.js <项目JSON路径>
+ * 用法：alink scripts/build-topology.js <项目JSON路径> [--write]
  * 输入：项目 JSON（须已含 nodes——骨架填充后的全部章节节点；worldAnchor.endingsDesign 用于门控提示）
  * 输出：连接拓扑 JSON + 人类可读拓扑行（stdout），AI 据此逐节点写选项文字；
  *       targetNodeId 必须完全按拓扑填写，禁止更改。
+ * 加 --write 时：拓扑（connections + needChoiceNodes）同时写入项目 JSON 的 project.topology。
  *
  * 拓扑规则：
  * - 从每个 branch 向后扫描至 merge（汇回）或下一个 branch/start（不汇合——终章路线门控）
@@ -16,8 +17,9 @@
 const fs = require('fs');
 
 const file = process.argv[2];
+const writeBack = process.argv.includes('--write');
 if (!file || !fs.existsSync(file)) {
-  console.error('用法: alink scripts/build-topology.js <项目JSON路径>');
+  console.error('用法: alink scripts/build-topology.js <项目JSON路径> [--write]');
   process.exit(2);
 }
 
@@ -205,5 +207,10 @@ const result = {
   topoText: topoLines,
 };
 
+if (writeBack) {
+  project.topology = { generatedAt: new Date().toISOString(), connections: result.topology, needChoiceNodes: result.needChoiceNodes };
+  fs.writeFileSync(file, JSON.stringify(project, null, 2) + '\n');
+}
+
 console.log(JSON.stringify(result, null, 2));
-console.error(`\n拓扑就绪：${conns.length} 条连接，${needChoices.length} 个节点待写选项。topoText 可直接嵌入选项设计提示词。`);
+console.error(`\n拓扑就绪：${conns.length} 条连接，${needChoices.length} 个节点待写选项。topoText 可直接嵌入选项设计提示词。${writeBack ? `拓扑已写入 ${file}（project.topology）。` : ''}`);

@@ -1,16 +1,18 @@
 #!/usr/bin/env alink
 /**
  * 互动影游项目本地校验脚本
- * 用法：alink scripts/validate.js <项目JSON路径>
+ * 用法：alink scripts/validate.js <项目JSON路径> [--write]
  * 按 23 项检测（结构完整性 13 + 叙事质量 10）输出 ValidationReport 与通过率。
- * 通过率 = 100 − error×20 − warning×8 − info×2（下限 0）
+ * 通过率 = 100 − error×20 − warning×8 − info×2（下限 0）。
+ * 加 --write 时：报告同时写入项目 JSON 的 lastValidation（校验不通过也会写入，便于修复后对比）。
  */
 const fs = require('fs');
 const path = require('path');
 
 const file = process.argv[2];
+const writeBack = process.argv.includes('--write');
 if (!file || !fs.existsSync(file)) {
-  console.error('用法: alink scripts/validate.js <项目JSON路径>');
+  console.error('用法: alink scripts/validate.js <项目JSON路径> [--write]');
   process.exit(2);
 }
 
@@ -351,5 +353,10 @@ const report = {
 };
 
 console.log(JSON.stringify(report, null, 2));
+if (writeBack) {
+  project.lastValidation = report;
+  fs.writeFileSync(file, JSON.stringify(project, null, 2) + '\n');
+  console.error(`校验报告已写入 ${file}（lastValidation）。`);
+}
 console.error(`\n通过率: ${passRate}（error ${count.error} / warning ${count.warning} / info ${count.info}）`);
 process.exit(count.error > 0 ? 1 : 0);

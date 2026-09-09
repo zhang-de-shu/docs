@@ -2,10 +2,12 @@
 /**
  * 逐章骨架搭建脚本（移植自原项目 lib/ai/prompts/structure.ts「structure:chapter」的骨架计算逻辑）
  *
- * 用法：alink scripts/build-skeleton.js <项目JSON路径> <章序号(从1起)>
+ * 用法：alink scripts/build-skeleton.js <项目JSON路径> <章序号(从1起)> [--write]
  * 输入：项目 JSON（须已含 worldAnchor、scalePlan、characters、spine）
- * 输出：该章的骨架 JSON（acts/nodes 槽位与 type 已定，title/notes 为待 AI 填充的槽位提示），
+ * 输出：该章的骨架 JSON（acts/nodes 槽位与 type 已定，节点含确定性 id，title/notes 为待 AI 填充的槽位提示），
  *       以及供 AI 填充时使用的硬约束摘要（stderr）。
+ * 加 --write 时：把本章骨架（章节/幕记录与节点）直接合并写入项目 JSON（幂等：重跑仅替换本章），
+ *   stdout 仍打印骨架供 AI 填充；不加时只打印不写盘。
  *
  * 设计说明：节点槽位与 type 全部由本脚本在代码层面精确计算（跨幕合并、BE 配额、
  * 幕结构模板、跨幕后处理），AI 只负责填充 title/notes——计数类工作不让模型做。
@@ -14,8 +16,9 @@ const fs = require('fs');
 
 const file = process.argv[2];
 const chapterArg = Number(process.argv[3]);
+const writeBack = process.argv.includes('--write');
 if (!file || !fs.existsSync(file) || !Number.isInteger(chapterArg) || chapterArg < 1) {
-  console.error('用法: alink scripts/build-skeleton.js <项目JSON路径> <章序号(从1起)>');
+  console.error('用法: alink scripts/build-skeleton.js <项目JSON路径> <章序号(从1起)> [--write]');
   process.exit(2);
 }
 
@@ -230,6 +233,64 @@ const acts = Array.from({ length: actCount }, (_, ai) => ({
   }
 }
 
+// ── 节点 id / actId / 章节-幕记录组装；--write 时直接写回项目 JSON ──
+const chapterId = `c${chapterIndex + 1}`;
+acts.forEach((act, ai) => {
+  const actId = `${chapterId}a${ai + 1}`;
+  act.id = actId;
+  act.dramaticFunction = actCount === 1
+    ? (isLast ? 'resolution' : 'turn')
+    : (ai === 0 ? 'setup' : ai === actCount - 1 ? (isLast ? 'resolution' : 'turn') : 'conflict');
+  act.nodeIds = act.nodes.map((n, ni) => {
+    n.id = `${actId}n${ni + 1}`;
+    n.actId = actId;
+    return n.id;
+  });
+});
+
+function chapterRecord() {
+  return {
+    order: chapterIndex + 1,
+    title: chapterOutline[chapterIndex]?.title ?? `第${chapterIndex + 1}章：章名`,
+    acts: acts.map(a => ({ id: a.id, title: a.title, nodeIds: a.nodeIds, dramaticFunction: a.dramaticFunction })),
+  };
+}
+
+// 重建全局节点序列：按章节顺序拼接各章节点（本章用新节点替换旧节点），保证数组顺序 = 叙事顺序
+function rebuildNodes(proj) {
+  const chapOfId = (id) => { const m = /^c(\d+)a\d+n\d+$/.exec(String(id)); return m ? Number(m[1]) : null; };
+  const byChapter = new Map();
+  const stray = [];
+  for (const n of proj.nodes || []) {
+    const co = chapOfId(n.id);
+    if (co === null) { stray.push(n); continue; }
+    if (!byChapter.has(co)) byChapter.set(co, []);
+    byChapter.get(co).push(n);
+  }
+  byChapter.set(chapterIndex + 1, acts.flatMap(a => a.nodes));
+  const flat = [];
+  for (const co of [...byChapter.keys()].sort((x, y) => x - y)) flat.push(...byChapter.get(co));
+  if (stray.length) console.error(`警告：发现 ${stray.length} 个非脚本命名的既有节点，已追加到节点序列末尾`);
+  flat.push(...stray);
+  flat.forEach((n, i) => { n.order = i + 1; });
+  return flat;
+}
+
+if (writeBack) {
+  project.chapters = Array.isArray(project.chapters) ? project.chapters : [];
+  project.nodes = Array.isArray(project.nodes) ? project.nodes : [];
+  const record = chapterRecord();
+  const oldIdx = project.chapters.findIndex(c => Number(c.order) === chapterIndex + 1);
+  if (oldIdx >= 0) project.chapters[oldIdx] = record;
+  else {
+    const at = project.chapters.findIndex(c => Number(c.order) > chapterIndex + 1);
+    if (at >= 0) project.chapters.splice(at, 0, record);
+    else project.chapters.push(record);
+  }
+  project.nodes = rebuildNodes(project);
+  fs.writeFileSync(file, JSON.stringify(project, null, 2) + '\n');
+}
+
 const actualNodeCounts = acts.map(a => a.nodes.length);
 const actualChapterTotal = actualNodeCounts.reduce((s, n) => s + n, 0);
 
@@ -246,6 +307,7 @@ const chapterArcs = Object.entries(charArcs)
 const result = {
   chapter: chapterOutline[chapterIndex]?.title ?? `第${chapterIndex + 1}章`,
   skeleton: { title: chapterOutline[chapterIndex]?.title ?? `第${chapterIndex + 1}章`, acts },
+  written: writeBack ? { file, chapterId, nodeCount: actualChapterTotal } : null,
   constraint: {
     totalNodes, chapterCount, actCount, chapterTargetNodes, actualChapterTotal,
     actualNodeCounts,
@@ -258,4 +320,4 @@ const result = {
 };
 
 console.log(JSON.stringify(result, null, 2));
-console.error(`骨架就绪：本章目标 ${chapterTargetNodes} 节点，实际 ${actualChapterTotal} 节点（逐幕：${actualNodeCounts.join('，')}）。AI 填充时节点数量/顺序/type 不可更改，仅替换 title/notes。`);
+console.error(`骨架就绪：本章目标 ${chapterTargetNodes} 节点，实际 ${actualChapterTotal} 节点（逐幕：${actualNodeCounts.join('，')}）。${writeBack ? `已写入 ${file}（重跑幂等，仅替换本章）。` : '未写盘（加 --write 直接写入项目 JSON）。'}AI 填充：alink scripts/fill-nodes.js <项目JSON路径> <填充JSON路径>（{"chapters":..,"acts":..,"titles":{nodeId:{title,notes}}}）；节点数量/顺序/type 不可更改，仅替换 title/notes。`);
