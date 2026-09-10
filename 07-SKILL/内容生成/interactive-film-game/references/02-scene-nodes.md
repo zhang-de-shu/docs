@@ -24,7 +24,7 @@
    node scripts/build-topology.js <项目JSON路径> --write
    ```
    拓扑由脚本写入 project.json；AI 按拓扑逐节点写选项文字：normal 推进节点 2-3 个真选择（同目标不同语气/变量效果）；菱形分支各路径写 variableEffects；路线门控用结局 keyVariable（阈值 0-10 量表取 3-6）；BE 选项不带 variableEffects。写完经 fill-nodes.js 落盘。
-4. **归场**：节点按幕归场（`sceneId`），随节点填充一起落盘；场的 location/time/在场人物骨架随场记录写入。
+4. **归场与出场登记**：节点按幕归场（`sceneId`），随节点填充一起落盘；场的 location/time/在场人物骨架随场记录写入，并在场记录上标记每个角色的**首次出场节点**（firstAppearance）——供阶段四的人物引介使用。
 
 ## 产物
 

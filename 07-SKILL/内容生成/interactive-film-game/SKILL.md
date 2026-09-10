@@ -35,7 +35,7 @@ description: 互动影游全流程创作技能：从用户的一句话/一个场
 | 一、故事线框架 | `references/01-story-framework.md` | 从种子直接生成：整体时间跨度 + 序章（背景交代与教学）+ 各章时间点划分 + 故事核心 + 每章幕结构 + 结局设计（对应章节映射）+ 精简变量 + 主角 fatalFlaw + 回响映射 |
 | 二、幕内拆节点与分支 | `references/02-scene-nodes.md` | 每幕拆节点（第一章开头即死 BE 加密）+ 节点剧情 + 抉择项及影响 + 分支拓扑 |
 | 三、结构验证 | `references/03-structure-validate.md` | 脚本校验至闭环（error=0：无死路、无困死、结局可达）+ 定向修复 |
-| 四、叙事化润色 | `references/04-narrative-polish.md` | 场背景充实 + 逐节点叙事文本（narrative，对白嵌于其中，独白按需）+ 导出（剧本.md / project.json / story.ink） |
+| 四、叙事化润色 | `references/04-narrative-polish.md` | 场背景充实 + 人物出场引介（首次出场交代身份，隐藏身份角色用神秘感引介）+ 逐节点叙事文本（narrative，对白嵌于其中，独白按需）+ 导出（剧本.md / project.json / story.ink） |
 
 
 ## 脚本黑盒契约（硬约束）
