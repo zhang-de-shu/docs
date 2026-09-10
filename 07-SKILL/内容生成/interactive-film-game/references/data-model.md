@@ -27,6 +27,7 @@ Project
 
 - `storyCore` 故事核心（从用户输入提炼，必须包含"主角想要什么 + 什么在阻碍"的张力）
 - `theme` 核心主题、`genre` 类型/风格、`worldRules` 世界规则（一句话级别，服务于选择，不做设定集）
+- `timeSpan` 全剧整体时间跨度（数月乃至数年；各章是跨度内的一个或多个时间点，章间以时间跳跃相连，后果跨章累积）
 - `durationMinutes` 目标时长（分钟，**单路径口径**；素材总量约为单路径的 3-5 倍）
 - `endingCount` 结局数量
 - `endingsDesign: EndingDesign[]`（每个结局标注对应章节/幕：`chapter` 字段）
@@ -38,6 +39,7 @@ Project
 - `theme` 核心主题
 - `genre` 类型/风格
 - `worldRules` 世界规则（应是"逼迫角色做出艰难选择"的引擎，不是设定装饰）
+- `timeSpan` 全剧整体时间跨度（数月乃至数年；各章是跨度内的一个或多个时间点，章间以时间跳跃相连，后果跨章累积）
 - `durationMinutes` 目标时长（分钟，**单路径口径**；素材总量约为单路径的 3-5 倍）
 - `endingCount` 结局数量
 - `endingsDesign: EndingDesign[]`（AI 结局设计产出）
