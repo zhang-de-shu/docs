@@ -318,26 +318,58 @@ for (const n of nodes) {
     }
   }
 }
-// 15. BE 密度：每章即死 BE 岔口 4-8 个（第 1 章必须 ≥1 个完成选择教学）
+// 15. BE 密度与结构：每章即死 BE 岔口 4-8 个（占选择节点 20-30%），第 1 章 ≥1 个；节点数 20-30（序章 10-15）
+//     BE 判定依据：branch 节点带 beDeath 标记，或标题/备注含即死关键词，或存在直通 ending(type=bad) 的选项
 {
   const chapOf = (id) => { const m = /^c(\d+)/.exec(String(id)); return m ? Number(m[1]) : null; };
-  const beByChapter = new Map();
+  const badEndingIds = new Set(endings.filter(e => e.type === 'bad').map(e => e.nodeId).filter(Boolean));
+  const isBEBranch = (n) => {
+    if (n.type !== 'branch') return false;
+    if (n.isDeadEndBE === true) return true;
+    if (/即死岔口|即死结局|BAD END/.test((n.title || '') + (n.notes || ''))) return true;
+    // 选项直接指向 bad 结局节点
+    return choicesOf(n).some(c => badEndingIds.has(c.targetNodeId));
+  };
+  const byChapter = new Map(); // c -> { nodes, branches, be, firstBEPos, lastBEPos }
   for (const n of nodes) {
-    if (n.type !== 'branch') continue;
-    const isBE = /即死岔口|改为即死结局/.test((n.title || '') + (n.notes || ''));
-    if (!isBE) continue;
     const c = chapOf(n.id);
     if (c === null) continue;
-    beByChapter.set(c, (beByChapter.get(c) || 0) + 1);
-  }
-  if (beByChapter.size > 0) {
-    for (const [c, cnt] of beByChapter) {
-      if (cnt < 4) add('warning', 'BE_DENSITY_LOW', `第${c}章即死 BE 岔口仅 ${cnt} 个（基准 4-8 个，占选择节点 20-30%）——互动密度不足，会退化成"可点击的短剧"`);
-      if (cnt > 8) add('info', 'BE_DENSITY_HIGH', `第${c}章即死 BE 岔口 ${cnt} 个，超过基准上限 8 个，检查是否惩罚过密`);
+    if (!byChapter.has(c)) byChapter.set(c, { nodes: 0, branches: 0, be: 0, firstBEPos: null, lastBEPos: null });
+    const s = byChapter.get(c);
+    s.nodes++;
+    if (n.type === 'branch') {
+      s.branches++;
+      if (isBEBranch(n)) {
+        s.be++;
+        const pos = Number(/n(\d+)$/.exec(n.id)?.[1] || 0);
+        if (s.firstBEPos === null || pos < s.firstBEPos) s.firstBEPos = pos;
+        if (pos > s.lastBEPos) s.lastBEPos = pos;
+      }
     }
-    // 第 1 章：必须有 BE（选择即后果教学）
-    const firstChapterWithNodes = Math.min(...nodes.map(n => chapOf(n.id)).filter(v => v !== null));
-    if (firstChapterWithNodes === 1 && !(beByChapter.get(1) >= 1)) {
+  }
+  if (byChapter.size > 0) {
+    for (const [c, s] of byChapter) {
+      const isPrologue = c === 0; // 序章（c0 前缀）10-15 节点、1-2 个 BE
+      if (isPrologue) {
+        if (s.be < 1) add('warning', 'BE_DENSITY_LOW', `序章即死 BE 岔口 ${s.be} 个（教学基准 1-2 个）——缺失"选择即后果"教学`);
+        if (s.be > 2) add('info', 'BE_DENSITY_HIGH', `序章即死 BE 岔口 ${s.be} 个，超过教学基准 2 个，序章不应过度惩罚`);
+        continue;
+      }
+      if (s.nodes < 20) add('warning', 'CHAPTER_TOO_THIN', `第${c}章仅 ${s.nodes} 个节点（基准 20-30）——互动密度不足，会退化成"可点击的短剧"`);
+      if (s.nodes > 30) add('info', 'CHAPTER_TOO_LONG', `第${c}章 ${s.nodes} 个节点，超过基准上限 30 个`);
+      if (s.be < 4) add('warning', 'BE_DENSITY_LOW', `第${c}章即死 BE 岔口仅 ${s.be} 个（基准 4-8 个，占选择节点 20-30%）——互动密度不足，会退化成"可点击的短剧"`);
+      if (s.be > 8) add('info', 'BE_DENSITY_HIGH', `第${c}章即死 BE 岔口 ${s.be} 个，超过基准上限 8 个，检查是否惩罚过密`);
+      // BE 散布：不应全部堆在章尾
+      if (s.be >= 2 && s.firstBEPos !== null && s.lastBEPos !== null && s.lastBEPos - s.firstBEPos < Math.floor(s.nodes / 3)) {
+        add('warning', 'BE_CLUSTERED', `第${c}章 ${s.be} 个即死 BE 集中在第 ${s.firstBEPos}-${s.lastBEPos} 节点区间，未按间隔散布全章——建议均衡分布，保持全程紧张感`);
+      }
+      // 第 1 章开头加密：前 5 个节点内出现首个 BE
+      if (c === 1 && s.firstBEPos !== null && s.firstBEPos > 5) {
+        add('warning', 'FIRST_BE_LATE', `第 1 章首个即死 BE 出现在本章第 ${s.firstBEPos} 个节点（应在前 5 个节点内）——需尽早把序章教学的规则变成真刀真枪`);
+      }
+    }
+    // 第 1 章必须有 BE（选择即后果教学）
+    if (byChapter.has(1) && byChapter.get(1).be < 1) {
       add('warning', 'NO_FIRST_CHAPTER_BE', '第 1 章没有任何即死 BE 岔口——缺失"选择即后果"教学，玩家不会把后续选择当真');
     }
   }
@@ -421,4 +453,42 @@ if (writeBack) {
   console.error(`校验报告已写入 ${file}（lastValidation）。`);
 }
 console.error(`\n通过率: ${passRate}（error ${count.error} / warning ${count.warning} / info ${count.info}）`);
+
+// ---------- 互动密度与结构摘要（供用户确认）----------
+{
+  const chapOf = (id) => { const m = /^c(\d+)/.exec(String(id)); return m ? Number(m[1]) : null; };
+  const badEndingIds = new Set(endings.filter(e => e.type === 'bad').map(e => e.nodeId).filter(Boolean));
+  const isBEBranch = (n) => {
+    if (n.type !== 'branch') return false;
+    if (n.isDeadEndBE === true) return true;
+    if (/即死岔口|即死结局|BAD END/.test((n.title || '') + (n.notes || ''))) return true;
+    return choicesOf(n).some(c => badEndingIds.has(c.targetNodeId));
+  };
+  const stats = new Map();
+  for (const n of nodes) {
+    const c = chapOf(n.id);
+    if (c === null) continue;
+    if (!stats.has(c)) stats.set(c, { nodes: 0, branches: 0, be: 0 });
+    const s = stats.get(c);
+    s.nodes++;
+    if (n.type === 'branch') { s.branches++; if (isBEBranch(n)) s.be++; }
+  }
+  const lines = ['', '═══ 互动密度与结构摘要（请确认）═══',
+    `总节点 ${nodes.length} / 分支 ${branchCount}（branch 占比 ${nodes.length ? Math.round(branchCount / nodes.length * 100) : 0}%，基准 ≥25%）`];
+  const fmtChapter = (label, s) => {
+    const beRange = label === '序章' ? '1-2' : '4-8';
+    const nodeRange = label === '序章' ? '10-15' : '20-30';
+    const okNodes = s.nodes >= (label === '序章' ? 10 : 20) && s.nodes <= (label === '序章' ? 15 : 30);
+    const okBE = s.be >= (label === '序章' ? 1 : 4) && s.be <= (label === '序章' ? 2 : 8);
+    return `  ${label}：${s.nodes} 节点（基准 ${nodeRange}）${okNodes ? '✓' : '✗'} | 即死 BE ${s.be} 个（基准 ${beRange}）${okBE ? '✓' : '✗'} | 分支占比 ${s.nodes ? Math.round(s.branches / s.nodes * 100) : 0}%`;
+  };
+  for (const c of [...stats.keys()].sort((a, b) => a - b)) {
+    lines.push(fmtChapter(c === 0 ? '序章' : `第${c}章`, stats.get(c)));
+  }
+  const endingNodesCnt = nodes.filter(n => n.type === 'ending').length;
+  lines.push(`  结局节点 ${endingNodesCnt} 个（结局定义 ${endings.length} 个，类型 ${[...new Set(endings.map(e => e.type || '?'))].join('/') || '无'}）`);
+  if (count.error > 0) lines.push(`  ⚠ 存在 ${count.error} 个结构性 error，须定向修复后重跑校验`);
+  lines.push('═══════════════════════════════════');
+  console.error(lines.join('\n'));
+}
 process.exit(count.error > 0 ? 1 : 0);

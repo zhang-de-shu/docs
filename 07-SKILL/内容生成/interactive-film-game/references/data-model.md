@@ -12,7 +12,7 @@ Project
 ├── scalePlan: ScalePlan（选中的规模方案，仅此一套，不再保留多套备选）
 ├── chapters: Chapter[]
 ├── nodes: StoryNode[]
-├── topology: { generatedAt, connections, needChoiceNodes }（阶段二 build-topology --write 写入）
+├── topology: 已废弃（骨架与拓扑由 AI 生成，不再由脚本写入；保留字段仅为兼容旧项目）
 ├── variables: Variable[]
 ├── echoPlan: EchoPlanItem[]（回响映射表，阶段一产出）
 ├── endings: Ending[]
@@ -21,7 +21,7 @@ Project
 └── aiMode: 'fast' | 'thinking'
 ```
 
-**结构分层**：章 → 幕/场（Scene）→ 小节（StoryNode）三级；导出与校验均按 章→节点 处理，场层为内容组织与美术服务。
+**结构分层**：章 → 场（Scene）→ 小节（StoryNode）三级；导出与校验均按 章→节点 处理，场层为内容组织与美术服务。
 
 ## StoryFramework（阶段一产出：由用户种子直接生成）
 
@@ -30,8 +30,8 @@ Project
 - `timeSpan` 全剧整体时间跨度（数月乃至数年；各章是跨度内的一个或多个时间点，章间以时间跳跃相连，后果跨章累积）
 - `durationMinutes` 目标时长（分钟，**单路径口径**；素材总量约为单路径的 3-5 倍）
 - `endingCount` 结局数量
-- `endingsDesign: EndingDesign[]`（每个结局标注对应章节/幕：`chapter` 字段）
-- `scalePlan.chapters[].scenes[]`：每章几幕、每幕内容（title + brief）
+- `endingsDesign: EndingDesign[]`（每个结局标注对应章节/场：`chapter` 字段）
+- `scalePlan.chapters[].scenes[]`：每章几场、每场内容（title + brief）
 
 ## Character（四维心理模型 + 声纹卡，可选）
 
@@ -91,7 +91,7 @@ Project
 
 - Chapter：`title`、`order`
 
-## Scene（幕/场：一段连续时空，章与节点之间的内容层）
+## Scene（场：一段连续时空，章与节点之间的内容层）
 
 - `sceneId`（`c{章}s{序}`）、`chapterOrder`、`nodeIds: string[]`（本场覆盖的节点，按顺序；节点 100% 归场，不重叠）
 - 划场依据（满足其一即切场）：地点变化 / 显著时间流逝 / 在场人物名单变化 / 道具状态关键改变；每章通常 4-8 场

@@ -24,7 +24,7 @@
 
 1. **场背景充实**：为每场补齐 environment（真实感）/ time_weather / key_props（含跨场流转）/ art_prompt（同章风格前缀一致）。
 2. **逐节点润色**：每节点产出 narrative（嵌入对白 6-10 行）+ 按需 monologue + emotionFunction（emotionIn/out、playerEmotion、tension、internal_lie、fear）+ entryState/exitState；回响读取节点的对白/叙述必须兑现早前 Flag（道具状态同步更新到场 key_props）。
-3. **内容落盘**：经 fill-nodes.js 分批合并写入 project.json，防止丢失。
+3. **内容落盘**：按 SKILL.md「写入口规则」以精确 patch 方式分批写入 project.json（每批只改本批节点的 narrative/dialogue/emotionFunction 等字段，不触碰结构与选项），防止丢失。
 4. **导出交付**（必须加 `--ink`，三件缺一不可）：
    ```bash
    node scripts/export.js <项目JSON路径> <输出目录> --ink
