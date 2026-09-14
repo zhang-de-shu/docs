@@ -3,7 +3,7 @@
 ## 0. 互动影游适配要点（区别于互动短剧/漫画）
 
 1. **UI 安全区**：选项按钮压在图下部——所有节点图提示词追加 `Keep the lower third of the frame relatively uncluttered (choice overlay zone).`；重要主体居中/偏上。
-2. **抉择张力**：branch 节点图用对峙构图、双侧光源、视线冲突，拍出"即将分攈"的悬念；BE 节点与其回溯目标选择点用相似机位制造呼应。
+2. **抉择张力**：branch 节点图用对峙构图、双侧光源、视线冲突，拍出"即将分岔"的悬念；BE 节点与其回溯目标选择点用相似机位制造呼应。
 3. **重玩不变性**：同一节点被不同路径重访时图相同——画面只呈现到该节点为止已确定的信息；分支结果（谁死了/拿没拿到凭证）属于后续节点的帧，不属于选择点本身。
 4. **结局帧独立**：BE/结局是独立帧（不是同一条时间线的下一帧），refs 只锚角色卡+场景底图，不链上一帧，避免被前一路径的画面惯性污染。
 5. **动态视频仅关键处**：runtime 支持 media.type=video；若某节点需动态（开场/重大转折），先用本管线出首帧，再另行图生视频——首帧也走同一确认循环。
@@ -15,8 +15,8 @@
 | shotType | 职能 | 一致性风险 | 参考图 refs | 提示词锚定段 |
 | --- | --- | --- | --- | --- |
 | `scene` 场景镜头 | 交代时空/环境，人物极小或缺席 | **空间漂移**（布局/光源变来变去） | `[同 Scene 底图]` | 场景描写**逐字复用底图措辞**，只写状态层变化（天气、时间推移、光照） |
-| `character` 人物镜头 | 对峙/对话/动作，推剧情 | **角色漂移**（脸/服装/发型变） | `[角色设定卡, 场景底图 或 上一张剧情图]` | 角色 profile 逐字 + continuity 指令 |
-| `detail` 细节镜头 | 道具特写、线索、氛围空镜 | **道具漂移**（信封颜色/刀的形状变） | `[该道具上次出现的图]` | 道具档案（首次出现时在 manifest.props 登记的描述）逐字 |
+| `character` 人物镜头 | 对峙/对话/动作，推剧情 | **角色漂移**（脸/服装/发型变） | `[场景底图, 角色设定卡]`（顺序与上游 imagePrompt 的 ref 标注一致；也可用上一张剧情图替代场景底图） | 角色 profile 逐字 + continuity 指令 |
+| `prop` 细节镜头 | 道具特写、线索、氛围空镜 | **道具漂移**（信封颜色/刀的形状变） | `[该道具上次出现的图]` | 道具档案（首次出现时在 manifest.props 登记的描述）逐字 |
 
 分镜守则：
 - **Scene 底图先行**：每个 sceneId 在画它的节点图之前，先出一张 establishing shot（`images/scenes/c{章}s{序}.jpg`），空间布局、光源、色调以它为准；同场后续图refs 必含它。
@@ -41,6 +41,8 @@
 - 多角色同框时在末尾加区分指令：`{A} is on the left, {B} is on the right, do not blend their features.`
 
 ## 3. 提示词组装模板
+
+**模板仅作兜底**：project.json 已含上游产出的提示词字段（`scene.art_prompt`、`node.imagePrompt`、`characters[].appearance`）时一律原样采纳（SKILL.md §4 硬约束）；仅当字段缺失时才按以下模板补写，补写结果回填 project.json，保持提示词唯一来源。refs 顺序铁律：**参考图1=场景底图（仅作背景构图），参考图2+=角色设定卡（仅作人物外貌）**，与上游 ref 方向标注一致。
 
 ### 角色设定卡
 ```
@@ -78,8 +80,8 @@ SCENE: {场景描写（与底图同措辞）}
 KEY PROPS: {key_props 当前状态}
 ACTION: {本节点可见动作——从 sceneDesc/narrative 提取"摄影机能拍到"的内容；禁止内心活动入画}
 CAMERA: {景别/机位：medium two-shot / over-the-shoulder / low angle ...}
-First reference image is the CHARACTER SHEET — it is a CHARACTER DESIGN reference: copy the character's face / hairstyle / outfit EXACTLY.
-Second reference is the SCENE PLATE — it is a LOCATION/LIGHTING reference: keep the same location, spatial layout and light direction; do NOT copy any characters from it.
+First reference image is the SCENE PLATE — it is a LOCATION/LIGHTING reference: keep the same location, spatial layout and light direction; do NOT copy any characters from it.
+Second and later reference images are CHARACTER SHEETS — they are CHARACTER DESIGN references: copy each character's face / hairstyle / outfit EXACTLY.
 {负面词}
 ```
 
@@ -151,8 +153,8 @@ Avoid: realistic rendering, gradients, airbrush, thick painterly shading, polish
       "sceneId": "c1s2",
       "shotType": "character",
       "prompt": "完整提示词原文",
-      "refs": ["images/sheets/林秋.png", "images/scenes/c1s2.jpg"],
-      "path": "images/c1n3.jpg",
+      "refs": ["images/scenes/c1s2.jpg", "images/sheets/林秋.png"],
+      "path": "images/nodes/c1/c1n3.jpg",
       "status": "done",
       "qc": { "identity": 92, "wardrobe": 88, "setMatch": 95, "manifest": 90 },
       "retries": 1
