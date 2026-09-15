@@ -49,13 +49,12 @@
 1. **场背景充实**：为每场补齐 environment（真实感）/ time_weather / key_props（含跨场流转）/ art_prompt（同章风格前缀一致）。
 2. **逐节点润色**：每节点产出 narrative（嵌入对白 6-10 行）+ 按需 monologue + emotionFunction（emotionIn/out、playerEmotion、tension、internal_lie、fear）+ entryState/exitState；回响读取节点的对白/叙述必须兑现早前 Flag（道具状态同步更新到场 key_props）。
 3. **内容落盘**：按 SKILL.md「写入口规则」以精确 patch 方式分批写入 project.json（每批只改本批节点的 narrative/dialogue/emotionFunction 等字段，不触碰结构与选项），防止丢失。
-4. **导出交付**（必须加 `--ink`，三件缺一不可）：
+4. **导出交付**（两件缺一不可）：
    ```bash
-   node scripts/export.js <项目JSON路径> <输出目录> --ink
+   node scripts/export.js <项目JSON路径> <输出目录>
    ```
    - `剧本.md`：按 章→场→节点 组织，节点含叙事文本、对白（说话人：台词）、玩家选项（含条件与变量标注）；BE 节点单独标注。
    - `project.json`：完整数据。
-   - `story.ink`：ink 脚本（VAR 声明自洽、条件结构保留、变量名净化）。
-   - 核对三个文件存在且非空。
+   - 核对两个文件存在且非空。
 5. **收尾复验**：内容润色不应动结构，但仍复跑一次 validate.js 确认 error 仍为 0（防止误改 targetNodeId/conditions），然后交付。
 
