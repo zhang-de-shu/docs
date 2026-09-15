@@ -18,10 +18,10 @@ data-model.md 中阶段一的所有字段，填入project.json中（title、imag
     - 好感度刻度沿用四级制：**少量 / 常规 / 大量 / 巨量**（及对应减值、清零=心碎），数值差异须玩家可感知。
     - **延迟回响最小要求（echoPlan 的验收线）**：变量写入后 ≥1 个后续节点读取；核心变量至少跨 1 章回响（第 2 章的选择在第 5 章开花）；蝴蝶效应式远期回响（看似无关的小选择在终盘重构为陷阱）全剧至少设计 1-2 处。
     - **角色卡（characters）**：主角 `fatalFlaw` 必填（"性格缺陷 → 恶果形式"映射，阶段二 BE 恶果必须引用或呼应，不得随机编造）；其余角色按需产出——需要维持声线一致的主要角色填四维心理模型（wound/lie/want/need）+ 声纹卡（voiceProfile）；启用好感系统时，好感对象标注 `isAffectionTarget: true` 且必须对应一个 relationship 变量的 target。
-8. **设计凭证/信物表（items）**：全剧 1-4 个玩法层凭证/信物（能改变分支走向的物品：密信、玉佩、账本等），逐个标注 kind（evidence/token/tool）、是否 consumable、boundCharacter、requires 前置；无凭证系统则留空数组。
+8. **设计凭证/信物表（items）**：全剧 1-4 个玩法层凭证/信物（能改变分支走向的物品：密信、玉佩、账本等），逐个标注 kind（evidence/token/tool/item——item 为普通物品，仅用于绘图形态一致性，阶段二、四按需补充登记）、是否 consumable、boundCharacter、requires 前置；无凭证系统则留空数组。
     - `obtainNode` 阶段一暂填计划获得的章/场，节点 id 由阶段二回填。
     - 每个凭证的获得点与**所有读取点**登记 echoPlan 项（`variable` 用 `has:` 前缀，如 `has:secret_letter`），并把 id 写入该 item 的 `echoIds`。
-9. **定配图档位（imageTier）**：默认 `lean`（仅关键节点出图，其余复用场景底图占位）；用户明确要求全节点出图时才设 `full`，并在交付说明中确认。
+9. **定配图档位（imageTier）**：默认 `lean`（仅关键节点出图，其余节点在 imagePrompt.lean 登记复用节点 id 占位）；用户明确要求全节点出图时才设 `full`，并在交付说明中确认。
 10. **支线规划**：每章规划 1-2 条支线（各 2-5 小节，可跳过、不卡主线），提供主线之外的自我表达，是世界活着的证据。
 11. **种子不清时**：给用户 2-3 个方向选项（不同类型/基调/真相走向），让用户挑选后再细化。
 

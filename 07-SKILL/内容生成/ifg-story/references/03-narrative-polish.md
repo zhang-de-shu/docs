@@ -1,4 +1,4 @@
-# 阶段四：叙事化润色（narrative polish）
+# 阶段三：叙事化润色（narrative polish）
 
 
 ## 目标
@@ -8,7 +8,7 @@
     - **场补齐**：`environment`、`time_weather`、`key_props`（场骨架 sceneId/nodeIds/location/characters_present 为阶段二产出，本阶段不改；回响节点的道具状态流转同步更新到 key_props）
     - **允许微调**：`chapter.title`（章名随状态变化手法）
     - **禁止改动**：choices、conditions、variableEffects、targetNodeId、type、nodeIds、endings 等一切结构与选项字段——发现结构问题不在本阶段修，报告用户后回阶段三流程
-    - **配图字段不属于本阶段**：`imagePrompt`、`shotType`、`art_prompt`、`characters[].appearance` 由**阶段五**生成并写入 project.json，本阶段禁止预写
+    - **配图字段不属于本阶段**：`imagePrompt`、`shotType`、`art_prompt`、`characters[].character_prompt`、`items[].item_prompt`、`characters[].appearance` 由**阶段四**生成并写入 project.json，本阶段禁止预写
 - 当前任务：对每个节点做叙事化润色和丰富（纯文本，不含配图提示词）
 
 
@@ -21,20 +21,6 @@
 ```
 
 # 规则
-
-- **人称与视角（硬约束，先于文采）**：玩家**就是主角**，不是读者在读小说。本阶段所有文本必须按此校验。
-    - **旁白 `narrative`：第二人称「你」**。主角的动作 / 感知 / 心理一律用「你」；**禁止**用「他 / 沈砚」指代主角。
-        - ✗ 「他是被冷醒的。雪落在他的眼皮上。」 ✓ 「你是被冷醒的。雪落在你的眼皮上。」
-        - 反例禁写：「掌门」「沈砚」在旁白里给主角当主语（判词/公文/他人转述等被引号包裹的原文除外）。
-    - **独白 `monologue`：第一人称「我」**（保持现状）。单句 ≤30 字、现在时口语、不复述对白；其中的「他 / 她」只能指别人。
-    - **对话 `dialogue`：不改人称**。他人台词对主角用「你 / 您 / 掌门」等称呼；他人**背后议论或当庭指证**主角可用「他」；引号 `「…」` 内一律按说话人原话保留。
-    - **指代消解（关键）**：旁白里出现的「他 / 她 / 姓名」只有在**该句主语是别的角色**时才保留。每句都要问一句：「这个『他』是谁？」
-        - 保留：唐枕 / 裴无咎 / 阿槐 做主语时的「他」（含「他看见你」「他赌的是你」）；
-        - 转「你」：主语不是别人时的「他」，以及宾语位置的「看着他 / 替他 / 问他 / 把他」。（这类宾语「他」几乎都指主角）
-        - 性别线索：`她` 固定是女性角色（苏晚），不与主角混。
-    - **判定基准**：把任一节点的旁白单独抽出来给玩家看，他读到的应该是「**发生在我身上的事**」，而不是「一个叫沈砚的人的故事」。
-    - **禁止顺手改剧情**：本阶段只换人称与指代，不增删情节、不改动作用词、不动 `imagePrompt` / `shotType` / `art_prompt` / `choices`。引号内文本与 `dialogue` / `monologue` 必须逐字不变。
-    - **自检**：收尾时把每个节点旁白里剩下的「他」列出来逐条确认——只允许指向其他角色或位于引号内；新写入的任何「你」都必须是主角。
 
 - **场是背景的唯一载体**：environment / time_weather / key_props / characters_present / art_prompt 定义在场上，节点通过 sceneId 引用，禁止在节点级重复描述环境。
 - **节点是一段完整的故事**：`narrative`（150-400 字散文体）把环境感官、人物举止表情、情节推进织进叙述流，对白嵌在叙事里（禁止裸对白列表）；进入状态（承接上场）→ 本拍冲突 → 收在未解决处。同场节点靠 entryState/exitState 缝合，连读应成连续的故事。
@@ -58,5 +44,5 @@
     - **写完先过一遍人称**：narrative 用第二人称「你」（主角），monologue 用第一人称「我」，dialogue 不动；旁白里保留的「他」必须指其他角色。
 3. **内容落盘**：按 SKILL.md「写入口规则」以精确 patch 方式分批写入 project.json（每批只改本批节点的 narrative/dialogue/emotionFunction 等文本字段，不触碰结构与选项），防止丢失。
 4. **收尾复验**：内容润色不应动结构，但仍复跑一次 validate.js 确认 error 仍为 0（防止误改 targetNodeId/conditions），然后交付。
-5. **人称终检（必做）**：逐节点扫描 narrative 中残留的「他」，逐条确认指向其他角色或位于引号内；确认 `dialogue` / `monologue` / 引号内文本与上一版逐字一致、`imagePrompt` 等画面字段未被动过。
+5. **人称终检（必做）**：逐节点扫描 narrative 中残留的「他」，逐条确认指向其他角色或位于引号内；确认 `dialogue` / `monologue` / 引号内文本与上一版逐字一致、`imagePrompt` / `character_prompt` 等画面字段未被动过。
 

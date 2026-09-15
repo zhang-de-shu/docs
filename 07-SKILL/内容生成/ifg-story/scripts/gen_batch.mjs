@@ -6,18 +6,21 @@
  *   node gen_batch.mjs --prompt "..." --ref a.png,b.jpg --out images/nodes/c1/c1n3.jpg [--qc]
  *   node gen_batch.mjs --prompt-file p.txt --out out.png
  *
- * 批量模式 A：project（直接读 project.json，自动记账、断点续跑）：
+ * 批量模式 A：project（直接读 project.json，状态直接记账在各实体提示词字段内、断点续跑）：
  *   node gen_batch.mjs --project <项目目录>/project.json \
- *        [--group scenes|nodes|sheets] [--filter c1] [--status prompt_confirmed,failed] \
+ *        [--group characters|items|scenes|nodes] [--filter c1] [--status prompt_confirmed,failed] \
  *        [--limit N] [--qc] [--interval-ms 2000] [--force]
- *   槽位（全部存 project.json 内）：
- *     sheets   = characters[] 条目的 { name, appearance, sheetPath, status }
- *     scenes   = scene[] 条目的 { sceneId, art_prompt(prompt), imagePath(path), refs, status }
- *     nodes    = nodes[] 条目的 { id, imagePrompt(prompt), imagePath(path), refs, status, reusedFrom }
+ *   槽位（即 project.json 各实体的提示词字段，无独立记账区）：
+ *     characters = characters[] 条目的 character_prompt { prompt, refs?, path, status }
+ *     items      = items[] 条目的 item_prompt { prompt, refs?, path, status }
+ *     scenes     = scene[] 条目的 art_prompt { prompt, refs, path, status }
+ *     nodes      = nodes[] 条目的 imagePrompt { lean, prompt, refs, path, status, shotType }
+ *   refs 格式：[{"<图片路径>":"<类型>"}]（类型 character/scene/item/node）或 ["<图片路径>"]，脚本取路径上传
+ *   lean 档：imagePrompt.lean 非空 = 复用该节点 id 的图，本条不出图自动跳过
  *
- * 批量模式 B：tasks（角色设定卡 / 封面等临时清单，不记账）：
+ * 批量模式 B：tasks（角色图 / 封面等临时清单，不记账）：
  *   node gen_batch.mjs --tasks tasks.json [--base <项目目录>] [--qc] [--interval-ms 2000] [--force]
- *   tasks.json = [{ "id": "sheet-林秋", "prompt": "...", "refs": ["images/....png"], "out": "images/sheets/林秋.png" }]
+ *   tasks.json = [{ "id": "char-林秋", "prompt": "...", "refs": ["images/....jpg"], "out": "images/characters/林秋.jpg" }]
  *   槽位 = 每项的 { prompt, refs, out }
  *
  * 配置（优先级：命令行 > 环境变量 > 默认）：
@@ -89,6 +92,11 @@ const TIMEOUT_MS = 180_000
 const QC = flag('qc')
 
 // ——— 单图生成核心（返回退出码语义：0 成功 | 2 HTTP 错误 | 3 无图 | 4 异常 | 5 = 402） ———
+/** refs 归一化：支持 ["路径"] 与 [{"路径":"类型"}] 两种写法，统一取路径列表 */
+function refList(refs) {
+  return (refs || []).map((r) => (typeof r === 'string' ? r : Object.keys(r || {})[0])).filter(Boolean)
+}
+
 function loadRefs(refPaths) {
   return refPaths.filter(Boolean).map((p) => {
     const buf = fs.readFileSync(p)
@@ -268,35 +276,37 @@ async function batchMode() {
     projectPath = path.resolve(PROJECT)
     projectDir = path.dirname(projectPath)
     project = JSON.parse(fs.readFileSync(projectPath, 'utf8'))
-    if (!project.illustration) project.illustration = {} // 配图进度记账区
-    const ill = project.illustration
-    if (!ill.sheets) ill.sheets = {}
-    if (!ill.scenes) ill.scenes = {}
-    if (!ill.nodes) ill.nodes = {}
-    // sheets：来自 characters[].appearance / sheetPath
+    // characters：来自 characters[].character_prompt（缺失时按 appearance 档案兜底组装）
     for (const c of project.characters || []) {
-      if (!c.appearance) continue
-      const e = ill.sheets[c.name] || (ill.sheets[c.name] = {})
-      e.prompt = e.prompt || buildSheetPrompt(project, c) // 缺失时按外貌卡兜底组装
-      e.path = e.path || c.sheetPath || `images/sheets/${c.name}.png`
-      c.sheetPath = e.path // 回写，保持 characters 与记账一致
-      tasks.push({ group: 'sheets', id: c.name, prompt: e.prompt, refs: e.refs || [], out: path.resolve(projectDir, e.path), entry: e })
+      let e = c.character_prompt
+      if (!e) {
+        if (!c.appearance) continue
+        e = c.character_prompt = { prompt: '', path: '', status: 'pending' }
+      }
+      e.prompt = e.prompt || buildSheetPrompt(project, c)
+      e.path = e.path || `images/characters/${c.name}.jpg`
+      tasks.push({ group: 'characters', id: c.name, prompt: e.prompt, refs: refList(e.refs), out: path.resolve(projectDir, e.path), entry: e })
     }
-    // scenes：来自 scene[].art_prompt / imagePath
+    // items：来自 items[].item_prompt
+    for (const it of project.items || []) {
+      const e = it.item_prompt
+      if (!e) continue
+      e.path = e.path || `images/items/${it.id}.jpg`
+      tasks.push({ group: 'items', id: it.id, prompt: e.prompt, refs: refList(e.refs), out: path.resolve(projectDir, e.path), entry: e })
+    }
+    // scenes：来自 scene[].art_prompt
     for (const s of project.scene || []) {
-      const e = ill.scenes[s.sceneId] || (ill.scenes[s.sceneId] = {})
-      e.prompt = e.prompt || s.art_prompt || ''
-      e.path = e.path || s.imagePath || `images/scenes/${s.sceneId}.jpg`
-      s.imagePath = e.path
-      tasks.push({ group: 'scenes', id: s.sceneId, prompt: e.prompt, refs: e.refs || [], out: path.resolve(projectDir, e.path), entry: e })
+      const e = s.art_prompt
+      if (!e) continue
+      e.path = e.path || `images/scenes/${s.sceneId}.jpg`
+      tasks.push({ group: 'scenes', id: s.sceneId, prompt: e.prompt, refs: refList(e.refs), out: path.resolve(projectDir, e.path), entry: e })
     }
-    // nodes：来自 nodes[].imagePrompt / imagePath
+    // nodes：来自 nodes[].imagePrompt（lean 非空 = 复用节点图，不出图）
     for (const n of project.nodes || []) {
-      const e = ill.nodes[n.id] || (ill.nodes[n.id] = {})
-      e.prompt = e.prompt || n.imagePrompt || ''
-      e.path = e.path || n.imagePath || `images/nodes/${n.id.slice(0, n.id.indexOf('n'))}/${n.id}.jpg`
-      n.imagePath = e.path
-      tasks.push({ group: 'nodes', id: n.id, prompt: e.prompt, refs: e.refs || [], out: path.resolve(projectDir, e.path), entry: e, reusedFrom: e.reusedFrom })
+      const e = n.imagePrompt
+      if (!e) { console.warn(`[batch] node ${n.id}: 缺 imagePrompt，未入队`); continue }
+      e.path = e.path || `images/nodes/${n.id.slice(0, n.id.indexOf('n'))}/${n.id}.jpg`
+      tasks.push({ group: 'nodes', id: n.id, prompt: e.prompt, refs: refList(e.refs), out: path.resolve(projectDir, e.path), entry: e, leanId: e.lean || '' })
     }
   } else {
     const tasksPath = path.resolve(TASKS)
@@ -324,7 +334,7 @@ async function batchMode() {
   let queue = []
   for (const t of tasks) {
     const st = t.entry.status
-    if (t.reusedFrom) { skipped.push(`${t.id}(reusedFrom=${t.reusedFrom})`); continue } // lean 档占位节点，不出图
+    if (t.leanId) { skipped.push(`${t.id}(lean=${t.leanId})`); continue } // lean 档复用节点图，不出图
     if (PROJECT && st && !STATUSES.includes(st)) { skipped.push(`${t.id}(status=${st})`); continue }
     if (GROUP && t.group !== GROUP) { skipped.push(`${t.id}(group)`); continue }
     if (FILTER && !t.id.includes(FILTER)) { skipped.push(`${t.id}(filter)`); continue }

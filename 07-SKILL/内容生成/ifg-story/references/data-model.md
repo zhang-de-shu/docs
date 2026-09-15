@@ -11,12 +11,14 @@
   // ═══════════════ 顶层元信息 ═══════════════
   "title": "string",                       // 作品名
   "imageTier": "lean",                     // 'lean' | 'full' 配图档位；lean=仅关键节点出图、其余复用场景底图占位，默认 lean
-  "cover": "",                             // 菜单封面文件名（如 "cover.jpg"）；由阶段五配图生成封面后填写
+  "style": "",                             // 配图风格前缀（全剧锁定）-- 阶段四
+  "negative": "",                          // 配图全局负面词（全剧锁定）-- 阶段四
+  "cover": "",                             // 菜单封面文件名（如 "cover.jpg"）；由阶段四配图生成封面后填写
   "assetsBase": "",                        // images 目录的站点绝对路径或 CDN 前缀（中文需 URL 编码）；由阶段五部署阶段填写
 
-  // ═══════════════ 阶段一：故事蓝图 ═══════════════
-
-  "storyFramework": {                      // StoryFramework，由用户种子直接生成的故事线框架
+  // ═══════════════ 故事蓝图 ═══════════════
+  // 阶段一产出，由用户种子直接生成的故事线框架
+  "storyFramework": {
     "storyCore": "",                       // 故事核心：从用户输入提炼，必须包含"主角想要什么 + 什么在阻碍"的张力
     "theme": "",                           // 核心主题
     "genre": "",                           // 类型/风格
@@ -44,37 +46,9 @@
     }
   },
 
-  "characters": [                          // Character[]，可选：仅需主角 fatalFlaw；完整角色卡按需产出（四维心理模型 + 声纹卡）
-    {
-      "name": "",                          // 角色名
-      "role": "protagonist",               // 'protagonist' | 'antagonist' | 'support' | 'other'
-      "motivation": "",                    // 动机
-      "relationship": "",                  // 与其他角色的关系
-      "wound": "",                         // 心理伤痛（过去的创伤）
-      "lie": "",                           // 内心谎言（用来保护自己的错误信念）
-      "want": "",                          // 外部欲望（想得到什么）
-      "need": "",                          // 内在需求（真正需要什么）
-      "fatalFlaw": "",                     // 致命弱点，仅主角："性格缺陷 → 恶果形式"映射，即死 BE 岔口的恶果库——BE 的本质是这条路线的故事到此为止，真死只是形式之一，暴露/失败/崩塌/被逐同样成立；阶段二 BE 恶果必须引用或呼应此项，不得随机编造；配角不填
-      "isAffectionTarget": false,          // 是否好感对象（仅启用好感系统时标注，题材层选配）
-      "appearance": {                      // 外貌卡（美术档案，阶段五产出）；角色设定卡逐字采纳，禁止下游另行发明外貌
-        "face": "",                        // 面部稳定特征（英文 ≤25 词；表情/动作不入档案）
-        "head": "",                        // 发型/头饰（英文 ≤25 词）
-        "body": "",                        // 体型/服装（英文 ≤25 词）
-        "palette": ""                      // 色彩基调（英文）
-      },
-      "voiceProfile": {                    // 声纹卡
-        "speaking_rhythm": "",             // 说话节奏
-        "vocabulary": "",                  // 用词风格
-        "defense_mechanism": "",           // 压力下防御
-        "lie_tells": "",                   // 说谎特征
-        "sample_lines": []                 // 示例台词
-      }
-    }
-  ],
 
   // ═══════════════ 阶段一：状态系统 ═══════════════
   // 三张表分工：variables 记数值状态，items 记物品持有，echoPlan 登记每个状态的写入点与兑现点
-
   "variables": [                           // Variable[]，叙事变量（阶段一状态表设计产出）
     {
       "name": "",                          // 英文下划线命名，如 "affection_A"
@@ -88,36 +62,34 @@
         { "min": -5, "max": -2, "label": "冷陌" }
       ],
       "exclusiveGroup": ""                 // 可选，互斥组名——同组角色好感此消彼长，同一 choice 的 variableEffects 应体现对冲（+A/-B）
-
-      // 好感写入节奏：每个 relationship 变量每章有效写入 1-3 次，写入来源须在 choice.consequence 中注明类型
-      //（关键抉择/日常互动/赠礼）；好感清零须有承接（对应 echoPlan 项 + 心碎 BE/分支，不得无后果）
     }
   ],
-  // 状态表分层与数量：必选层 = 剧情Flag 全剧 1-3 个（只记真正要跨章兑现的关键事件，每个必须有回响计划）
-  //   + 路线/立场变量 1-2 个；题材层 0-2 个（好感度/角色存活状态/怀疑度，按题材选配）。
-  //   核心变量合计 3-6 个（items 不计入此限额）。
-  // 变量机制约定（跨全流程铁律）：所有变量为 0-10 小整数量表，通过 variableEffects 以 +1（少数 +2）累积，
-  //   禁止百分比；conditions 阈值必须 3-6。豁免：relationship 用 -5~+5；item 持有为 flag 语义，不适用 0-10 量表。
 
-  "items": [                               // Item[]，关键凭证/信物表（阶段一产出）；空数组 = 无凭证系统。
-                                           // 玩法层凭证（密信、玉佩、账本等能改变分支走向的物品）。
-                                           // 与 Scene.key_props（美术连续性道具）分工：key_props 服务画面与连续性，item 服务玩法；同一物件两者可同时登记
+  // ═══════════════ 物品清单 ═══════════════
+  // 阶段一产生关键凭证/信物（密信、玉佩、账本等能改变分支走向的物品）
+  // 阶段二、四产生普通物品
+  "items": [
     {
-      "id": "",                            // 英文下划线命名，如 "secret_letter"
+      "id": "",                            // 英文下划线命名，如 "secret_letter"（用于 has(item_id) 条件与图片路径）
       "name": "",                          // 中文显示名
-      "kind": "evidence",                  // 'evidence' 凭证（可出示/指证）| 'token' 信物（情感锚点）| 'tool' 道具（解锁路径）
-      "obtainNode": "",                    // 获得节点（c{章}n{序}）；阶段一可暂填计划获得的章/场，阶段二拆节点后回填具体节点 id
+      "kind": "evidence",                  // 'evidence' 凭证（可出示/指证）| 'token' 信物（情感锚点）| 'tool' 道具（解锁路径）｜ 'item' 普通物品（绘图形态一致性使用）
+      "obtainNode": "",                    // 获得节点（c{章}n{序}）；阶段一可暂填计划获得的章/场，阶段二拆节点后回填具体节点 id ； 普通物品留空，下同
       "obtainCondition": "",               // 可选，获得前置条件表达式
       "consumable": false,                 // true = 出示/使用后失效（一次性，如寄出的密信）；false = 永久持有
       "boundCharacter": "",                // 可选，对谁出示有效 / 谁能识破伪造
       "requires": "",                      // 可选，前置凭证 id（如"需先有信A才能解读信B"）
-      "echoIds": []                        // 关联的 echoPlan 项 id（每个关键凭证至少 1 条回响计划）
+      "echoIds": [],                       // 关联的 echoPlan 项 id（每个关键凭证至少 1 条回响计划）
+      "item_prompt": {
+        "prompt": "",                      // 中文配图提示词（完整的物品画像描述）
+        "path": "images/items/xx.jpg",  // 保存路径
+        "status": "pending"                // pending → prompt_confirmed（用户确认提示词）→ done（用户确认图片）/ rejected（意见记录后重绘）
+      }
     }
   ],
-  // Item 约束：全剧关键凭证 1-4 个；每个 item 的 obtainNode（写入）与所有读取点必须登记 echoPlan
-  //   （readMode 含 has_item 相关用法）；consumable=true 的凭证在消耗后，后续节点不得再引用其存在性（validate 校验）。
 
-  "echoPlan": [                            // EchoPlanItem[]，回响映射表（阶段一产出）；阶段二"回响读取节点"的直接输入
+  // ═══════════════ 关键凭证约束 ═══════════════
+  // 阶段一产出（关键 Flag 至少跨 1 章回响（readChapter > writeChapter）；全剧规划 1-2 处蝴蝶效应式回响）
+  "echoPlan": [
     {
       "variable": "",                      // 变量名（须在 variables 中已定义）；凭证类回响填 item id，前缀 "has:" 如 "has:secret_letter"
       "readMode": [],                      // 'dialogue_variant'（对白/独白变体替换）| 'choice_gated'（选项门控显隐）| 'branch'（分支走向改变）| 'ending'（结局判定）——同一回响可多选
@@ -126,11 +98,43 @@
       "echoDesc": ""                       // 回响方式描述（如"角色引用密信内容，未看过则该段对白替换"）；蝴蝶效应项注明
     }
   ],
-  // EchoPlan 约束：关键 Flag 至少跨 1 章回响（readChapter > writeChapter）；全剧规划 1-2 处蝴蝶效应式回响；
-  //   没有回响计划的 Flag 不应进入状态表。
 
-  // ═══════════════ 阶段二：叙事内容 ═══════════════
+  // ═══════════════ 人物画像 ═══════════════
+  // character_prompt/appearance 阶段四产出（配图阶段），其余字段阶段一产出
+  "characters": [                          // Character[]，可选：仅需主角 fatalFlaw；完整角色卡按需产出（四维心理模型 + 声纹卡）
+    {
+      "name": "",                          // 角色名
+      "role": "protagonist",               // 'protagonist' | 'antagonist' | 'support' | 'other'
+      "motivation": "",                    // 动机
+      "relationship": "",                  // 与其他角色的关系
+      "wound": "",                         // 心理伤痛（过去的创伤）
+      "lie": "",                           // 内心谎言（用来保护自己的错误信念）
+      "want": "",                          // 外部欲望（想得到什么）
+      "need": "",                          // 内在需求（真正需要什么）
+      "fatalFlaw": "",                     // 致命弱点，仅主角："性格缺陷 → 恶果形式"映射，即死 BE 岔口的恶果库——BE 的本质是这条路线的故事到此为止，真死只是形式之一，暴露/失败/崩塌/被逐同样成立；阶段二 BE 恶果必须引用或呼应此项，不得随机编造；配角不填
+      "isAffectionTarget": false,          // 是否好感对象（仅启用好感系统时标注，题材层选配）
+      "appearance": {                      // 外貌卡（美术档案，阶段四产出）；角色设定卡逐字采纳，禁止下游另行发明外貌
+        "face": "",                        // 面部稳定特征（英文 ≤25 词；表情/动作不入档案）
+        "head": "",                        // 发型/头饰（英文 ≤25 词）
+        "body": "",                        // 体型/服装（英文 ≤25 词）
+        "palette": ""                      // 色彩基调（英文）
+      },
+      "voiceProfile": {                    // 声纹卡
+        "speaking_rhythm": "",             // 说话节奏
+        "vocabulary": "",                  // 用词风格
+        "defense_mechanism": "",           // 压力下防御
+        "lie_tells": "",                   // 说谎特征
+        "sample_lines": []                 // 示例台词
+      },
+      "character_prompt": {
+        "prompt": "",                      // 中文配图提示词（完整的人物画像描述）
+        "path": "images/characters/林晚.jpg",  // 保存路径
+        "status": "pending"                // pending → prompt_confirmed（用户确认提示词）→ done（用户确认图片）/ rejected（意见记录后重绘）
+      }
+    }
+  ],
 
+  // ═══════════════ 章规划 ═══════════════
   "chapters": [                            // Chapter[]（阶段二产出；title 可在阶段三随状态变化微调）
     {
       "title": "",                         // 章标题
@@ -138,8 +142,10 @@
     }
   ],
 
-  // Scene[]，场层。阶段分工——阶段二产出骨架：sceneId / chapterOrder / nodeIds / location / characters_present（含首次出场登记）；
-  //   阶段三充实内容：time_weather / environment / key_props（key_props 随回响节点的道具状态流转在阶段三同步更新）；阶段五产出：art_prompt
+  // ═══════════════ 场景清单 ═══════════════
+  // 阶段二产出骨架：sceneId / chapterOrder / nodeIds / location / characters_present（含首次出场登记）
+  // 阶段三充实内容：time_weather / environment / key_props（key_props 随回响节点的道具状态流转在阶段三同步更新）
+  // 阶段四产出：art_prompt
   "scene":[
   {
     "sceneId": "c1s1",                   // c{章}s{序}
@@ -153,24 +159,27 @@
     "key_props": [],                     // 叙事性道具及状态（半盏冷茶、断刀出鞘）；跨场流转必须交代去向
     "characters_present": [],            // 在场人物及进场姿态；不在名单上的人物不得在本场开口。
                                          // 角色的首次出场所在节点须登记（供阶段三的出场引介使用）
-    "art_prompt": ""                     // 可直接喂给 AI 画图/视频生成的提示词（写实向；同章风格前缀一致；
-                                         // 同一空间复用时主体不变只变状态层）
+    "art_prompt": {
+      "prompt": "",                      // 中文配图提示词（完整的场景描述）
+      "refs": [{"images/items/xx.jpg":"item"}],  // 参考图（可选item）
+      "path": "images/scenes/c1s1.jpg",  // 保存路径
+      "status": "pending"                // pending → prompt_confirmed（用户确认提示词）→ done（用户确认图片）/ rejected（意见记录后重绘）
+    }
   }
   ],
 
-  "nodes": [                               // StoryNode[]，核心叙事单元 = 小节；数组顺序 = 叙事顺序
-                                           // 阶段分工——阶段二产出结构与交互：id / title / order / notes / type / sceneId / sceneHeader /
-                                           //   sceneDesc / choices / durationSeconds / exploreReturnNodeId；
-                                           //   阶段三产出叙事与美术：narrative / dialogue / monologue / emotionFunction / entryState /
-                                           //   exitState；阶段五产出美术：imagePrompt / shotType。阶段三禁止改动结构与选项字段
+  // ═══════════════ 节点清单 ═══════════════
+  // 阶段二产出结构与交互：id / title / order / notes / type / sceneId / sceneHeader / sceneDesc / choices / durationSeconds / exploreReturnNodeId
+  // 阶段三产出叙事与美术：narrative / dialogue / monologue / emotionFunction / entryState / exitState
+  // 阶段四产出绘图提示词：imagePrompt
+  "nodes": [
     {
       // —— 标识与类型 ——
       "id": "c1n1",                        // c{章}n{序}，如 c1n3（序章用 c0 前缀）
       "title": "",                         // 小节标题
       "order": 1,                          // 章内序号
       "notes": "",                         // 创作备注/骨架意图（这小节发生了什么）
-      "type": "normal",                    // 'start' 开场（唯一）| 'normal' 主线推进 | 'branch' 关键选择点（含即死 BE 岔口）
-                                           // | 'merge' 多路径汇回主线 | 'explore' 可选旁支 | 'ending' 结局（含非终章即死 BE）
+      "type": "normal",                    // 'start' 开场（唯一）| 'normal' 主线推进 | 'branch' 关键选择点（含即死 BE 岔口）| 'merge' 多路径汇回主线 | 'ending' 结局（含非终章即死 BE）
 
       // —— 场景衔接 ——
       "sceneId": "c1s1",                   // 所属场（c{章}s{序}）
@@ -184,11 +193,8 @@
       "sceneDesc": "",                     // 场景描述（摄影机语言：只写可见的动作与空间细节）
 
       // —— 叙事文本 ——
-      "narrative": "",                     // 叙事文本（150-400 字散文体）：环境感官 + 人物举止表情 + 情节推进织进叙述流，
-                                           // 对白嵌在叙事中；节点连读应为连续故事
-                                           // ★人称：必须第二人称「你」写主角（玩家=主角，不是三人称小说）；
-                                           //   主角一律「你」，禁止用「他/沈砚」指代；「他/她」只能指其他角色
-      "dialogue": [                        // DialogueLine[]，对白
+      "narrative": "",                     // 主角视角的叙事文本（150-400 字散文体）：环境感官 + 人物举止表情 + 情节推进织进叙述流，对白嵌在叙事中；节点连读应为连续故事
+      "dialogue": [                        // 对白
         {
           "speaker": "",                   // 说话人（主角自己的台词写角色名；对话不改人称）
           "text": "",                      // 台词
@@ -196,7 +202,7 @@
           "action": ""                     // 可选，行为细节；若该行行为未在 narrative 中体现则必填
         }
       ],
-      "monologue": [                       // MonologueLine[]，内心独白（按需不设配额，全剧总量约为节点数 30-50%）
+      "monologue": [                       // 内心独白（按需不设配额，全剧总量约为节点数 30-50%）
         {
           "place": "opening",              // 'opening'（信息差开场）| 'pre_choice'（选项前两难定格）| 'close'（BE/ending 收束）
           "text": "",                      // ★第一人称现在时口语（「我」），单句 ≤30 字；不复述对白；「他/她」只能指别人
@@ -208,14 +214,14 @@
       "emotionFunction": {
         "emotionIn": "",                   // 进场情绪
         "emotionOut": "",                  // 离场情绪
-        "playerEmotion": "",               // 目标玩家情绪
+        "playerEmotion": "",               // 目标角色情绪
         "tension": 0,                      // 张力 0-10
         "internal_lie": "",                // 本节点触碰的内心谎言
         "fear": ""                         // 角色恐惧
       },
 
       // —— 交互与时长 ——
-      "choices": [                         // Choice[]，玩家选项
+      "choices": [                         // 玩家选项
         {
           "text": "",                      // 选项文案，≤10 字
           "targetNodeId": "",              // 跳转目标节点 id
@@ -228,53 +234,34 @@
           "choiceWeight": "light"          // 'light' | 'heavy' | 'critical'
         }
       ],
-      "durationSeconds": 0,                // 预估时长（秒）
-      "exploreReturnNodeId": "",           // explore 节点专用：返回主线目标节点 id
 
-      // —— 美术（阶段五产出）——
-      "imagePrompt": "",                   // 英文配图提示词，结构：style + shotType
-                                           // + Scene(本场场景) + Story moment(标题+叙事摘要≤400字符) + mood
-                                           // + ref 方向标注 + 满幅构图 + negative
-      "shotType": "character"              // 'character'（在场角色含设定卡角色）| 'scene'（无角色）| 'prop'（特写道具时刻）
-                                           // ——与 imagePrompt 同批判定
+      // —— 绘图——
+      "imagePrompt": {
+        "lean":"",                          // 默认空，lean档时才可填写此字段（同时后续字段无需填写），值为复用的节点id
+        "prompt": "",                       // 中文配图提示词（完整的场景、人物、物品、镜头描述，参考图参考方向描述）
+        "refs": [{"images/scenes/c1s1.jpg":"scene"}, {"images/characters/林秋.jpg":"character"}],  // 参考图（可选character、scene、item、node）
+        "path": "images/nodes/c1/c1n1.jpg", // 保存路径
+        "status": "pending",                // pending → prompt_confirmed（用户确认提示词）→ done（用户确认图片）/ rejected（意见记录后重绘）
+        "shotType":""                       //镜头类型 -- 'character'（在场角色含设定卡角色）| 'scene'（无角色）| 'prop'（特写道具时刻）
+      }
     }
   ],
 
-  "illustration": {                        // 配图进度记账区（阶段五产出与维护；脚本 gen_batch.mjs 直接读写）
-                                           // 提示词本体存于 art_prompt / appearance / imagePrompt，此处字段与之同源
-    "style": "",                           // 风格前缀（全剧锁定）
-    "negative": "",                        // 全局负面词
-    "props": {},                           // { 道具名: "≤25词英文形态描述" }，细节镜头逐字复用，档案只锁形态
-    "sheets": {                            // 角色设定卡记账：{ 角色名: {prompt, refs, path, status, retries?} }
-      "林秋": { "prompt": "", "refs": [], "path": "images/sheets/林秋.png", "status": "pending" }
-    },
-    "scenes": {                            // 场景底图记账：{ sceneId: {prompt, refs, path, status} }
-      "c1s1": { "prompt": "", "refs": [], "path": "images/scenes/c1s1.jpg", "status": "pending" }
-    },
-    "nodes": {                             // 节点图记账：{ 节点id: {prompt, refs, path, status, reusedFrom?, qc?, retries?} }
-      "c1n1": { "prompt": "", "refs": ["images/scenes/c1s1.jpg", "images/sheets/林秋.png"],
-                "path": "images/nodes/c1/c1n1.jpg", "status": "pending" }
-                                           // refs 顺序铁律：参考图1=场景底图（仅背景构图），参考图2+=角色卡（仅人物外貌）
-                                           // status: pending → prompt_confirmed（用户确认提示词）→ done（用户确认图片）/ rejected（意见记录后重绘）
-                                           // lean 档未出图节点不记 prompt，改记 "reusedFrom": "<sceneId>" 复用场景底图占位
-    }
-  },
-
-  "endings": [                             // Ending[]，结局绑定（阶段二产出；阶段三禁止改动）
+  // ═══════════════ 结局 ═══════════════
+  // 阶段二产出
+  "endings": [
     {
       "nodeId": "",                        // 结局节点 id
       "title": "",                         // 结局名
       "type": "good",                      // 'good' | 'bad' | 'neutral' | 'secret'
       "description": "",                   // 结局描述
-      "conditions": "",                    // 达成条件；若依赖好感/凭证，须引用对应 relationship 变量阈值或 has(item_id)，
-                                           // 且该变量/凭证须有已兑现的 echoPlan 项
+      "conditions": "",                    // 达成条件；若依赖好感/凭证，须引用对应 relationship 变量阈值或 has(item_id)，且该变量/凭证须有已兑现的 echoPlan 项
       "variableConditions": "",            // 变量条件
       "reachPath": ""                      // 到达路径说明
     }
   ],
 
   // ═══════════════ 阶段二：校验与评审 ═══════════════
-
   "lastValidation": {                      // ValidationReport，由 scripts/validate.js 生成
     "generatedAt": "",                     // 生成时间
     "totalNodes": 0,                       // 总节点数
