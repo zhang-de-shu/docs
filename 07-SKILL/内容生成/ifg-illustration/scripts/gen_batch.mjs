@@ -18,8 +18,10 @@
  *   槽位 = 每项的 { prompt, refs, out }
  *
  * 配置（优先级：命令行 > 环境变量 > 默认）：
- *   --key ZENMUX_API_KEY | --model ZENMUX_IMAGE_MODEL（默认 google/gemini-2.5-flash-image）| --base-url ZENMUX_BASE_URL
- *   协议自动路由：google/* → vertex-ai generateContent；openai/* → images/generations|edits；其他 → vertex-ai :predict
+ *   --key ZENMUX_API_KEY | --model ZENMUX_IMAGE_MODEL（默认 meta/muse-image-1.0）| --base-url ZENMUX_BASE_URL
+ *   --chat-model ZENMUX_CHAT_MODEL（默认 qwen/qwen3.7-flash，仅 --qc 四轴自检用；google/* 走 vertex generateContent，其他走 /chat/completions）
+ *   协议自动路由：google/* → vertex-ai generateContent；openai/* 与 meta/* → images/generations|edits（OpenAI 兼容，强制 output_format=jpeg）；其他 → vertex-ai :predict
+ *   环境变量自动加载：脚本目录（或上溯）若有 .env 会自动读取，避免漏加载导致回落到硬编码默认
  *   本机走代理时需 NODE_OPTIONS="--require <skill>/scripts/proxy-preload.cjs"（Node fetch 默认不走 HTTP(S)_PROXY）
  *
  * 内置硬约束（与 SKILL.md 一致）：
@@ -35,15 +37,51 @@
  */
 import fs from 'fs'
 import path from 'path'
+import { fileURLToPath } from 'url'
+
+/** 自动加载脚本目录（或上溯 4 层）的 .env；已存在的环境变量优先，不覆盖 */
+function loadDotEnv() {
+  let dir = path.dirname(fileURLToPath(import.meta.url))
+  for (let i = 0; i < 4; i++) {
+    const f = path.join(dir, '.env')
+    if (fs.existsSync(f)) {
+      for (const line of fs.readFileSync(f, 'utf8').split('\n')) {
+        const m = line.match(/^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/)
+        if (!m) continue
+        const val = m[2].trim().replace(/^["']|["']$/g, '')
+        if (process.env[m[1]] === undefined) process.env[m[1]] = val
+      }
+      return
+    }
+    const up = path.dirname(dir)
+    if (up === dir) return
+    dir = up
+  }
+}
+loadDotEnv()
+
+/** 从 base64 头部推测真实图片格式（muse 出 jpeg/webp，不能一律标 png），仅用于日志如实显示 */
+function sniffImageMime(b64) {
+  const s = String(b64 || '')
+  if (s.startsWith('/9j/')) return 'image/jpeg'
+  if (s.startsWith('iVBORw0KGgo')) return 'image/png'
+  if (s.startsWith('UklGR')) return 'image/webp'
+  if (s.startsWith('R0lGOD')) return 'image/gif'
+  return ''
+}
 
 function arg(name, def) { const i = process.argv.indexOf('--' + name); return i >= 0 ? process.argv[i + 1] : def }
 const flag = (name) => process.argv.includes('--' + name)
 
 const KEY = arg('key') || process.env.ZENMUX_API_KEY || ''
-const MODEL = arg('model') || process.env.ZENMUX_IMAGE_MODEL || 'google/gemini-2.5-flash-image'
+const MODEL = arg('model') || process.env.ZENMUX_IMAGE_MODEL || 'meta/muse-image-1.0'
+// 协议路由：auto（默认）| openai（强制走 /images/generations|edits）| vertex（强制走 :predict）
+// auto 规则：google/* → vertex generateContent；openai/* 与 meta/* → OpenAI 兼容 images 路由；其余 → vertex :predict
+const PROTOCOL = (arg('protocol') || process.env.ZENMUX_IMAGE_PROTOCOL || 'auto').toLowerCase()
+const USE_OPENAI_IMAGES = PROTOCOL === 'openai' || (PROTOCOL === 'auto' && (MODEL.startsWith('openai/') || MODEL.startsWith('meta/')))
 const BASE_URL = (arg('base-url') || process.env.ZENMUX_BASE_URL || 'https://zenmux.ai/api/v1').replace(/\/$/, '')
 const VERTEX_BASE = 'https://zenmux.ai/api/vertex-ai'
-const CHAT_MODEL = arg('chat-model') || process.env.ZENMUX_CHAT_MODEL || 'google/gemini-2.5-flash'
+const CHAT_MODEL = arg('chat-model') || process.env.ZENMUX_CHAT_MODEL || 'qwen/qwen3.7-flash'
 const TIMEOUT_MS = 180_000
 const QC = flag('qc')
 
@@ -64,7 +102,7 @@ async function generateOnce(PROMPT, refPaths, OUT) {
   const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${KEY}` }
   try {
     let res
-    if (MODEL.startsWith('google/')) {
+    if (MODEL.startsWith('google/') && !USE_OPENAI_IMAGES) {
       res = await fetch(`${VERTEX_BASE}/v1/publishers/google/models/${MODEL.split('/')[1]}:generateContent`, {
         method: 'POST', signal: controller.signal, headers,
         body: JSON.stringify({
@@ -72,18 +110,19 @@ async function generateOnce(PROMPT, refPaths, OUT) {
           generationConfig: { responseModalities: ['TEXT', 'IMAGE'] },
         }),
       })
-    } else if (MODEL.startsWith('openai/')) {
+    } else if (USE_OPENAI_IMAGES) {
       if (refs.length) {
         const form = new FormData()
         form.append('model', MODEL)
         form.append('prompt', PROMPT)
+        form.append('output_format', 'jpeg')
         refs.forEach((r, i) => form.append('image[]', new Blob([Buffer.from(r.data, 'base64')], { type: r.mimeType }), `ref${i}.png`))
         res = await fetch(`${BASE_URL}/images/edits`, { method: 'POST', signal: controller.signal, headers: { Authorization: `Bearer ${KEY}` }, body: form })
       } else {
         res = await fetch(`${BASE_URL}/images/generations`, {
           method: 'POST', signal: controller.signal,
           headers: { ...headers, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ model: MODEL, prompt: PROMPT, response_format: 'b64_json', n: 1 }),
+          body: JSON.stringify({ model: MODEL, prompt: PROMPT, response_format: 'b64_json', output_format: 'jpeg', n: 1 }),
         })
       }
     } else {
@@ -126,7 +165,7 @@ async function generateOnce(PROMPT, refPaths, OUT) {
 
     fs.mkdirSync(path.dirname(OUT), { recursive: true })
     fs.writeFileSync(OUT, Buffer.from(b64, 'base64'))
-    console.log(`[gen] 已保存: ${OUT} (${mime}, ${Math.round(b64.length * 3 / 4 / 1024)}KB, refs=${refs.length})`)
+    console.log(`[gen] 已保存: ${OUT} (${sniffImageMime(b64) || mime}, ${Math.round(b64.length * 3 / 4 / 1024)}KB, refs=${refs.length})`)
     if (QC) await qcCheck(OUT, PROMPT)
     return 0
   } catch (e) {
@@ -141,19 +180,34 @@ async function generateOnce(PROMPT, refPaths, OUT) {
 async function qcCheck(imagePath, PROMPT) {
   const buf = fs.readFileSync(imagePath)
   const b = buf.toString('base64')
-  const mime = path.extname(imagePath).slice(1) === 'png' ? 'image/png' : 'image/jpeg'
+  const mime = sniffImageMime(b) || (path.extname(imagePath).slice(1) === 'png' ? 'image/png' : 'image/jpeg')
+  const JUDGE = 'You are an art QC judge for a cinematic interactive-film game. Score this single frame 0-100 on four axes and reply ONLY with JSON: {"identity":n,"wardrobe":n,"setMatch":n,"manifest":n,"weakest":"<axis>","note":"<one short sentence>"}\nidentity = rendered character matches the described character profile; wardrobe = costume continuity; setMatch = location/lighting matches a scene plate; manifest = the frame depicts exactly what the prompt asked.'
   try {
-    const res = await fetch(`${VERTEX_BASE}/v1/publishers/google/models/${CHAT_MODEL.split('/').pop()}:generateContent`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${KEY}` },
-      body: JSON.stringify({
-        contents: [{ role: 'user', parts: [
-          { text: 'You are an art QC judge for a cinematic interactive-film game. Score this single frame 0-100 on four axes and reply ONLY with JSON: {"identity":n,"wardrobe":n,"setMatch":n,"manifest":n,"weakest":"<axis>","note":"<one short sentence>"}\nidentity = rendered character matches the described character profile; wardrobe = costume continuity; setMatch = location/lighting matches a scene plate; manifest = the frame depicts exactly what the prompt asked.' },
-          { text: 'PROMPT:\n' + PROMPT },
-          { inlineData: { mimeType: mime, data: b } },
-        ] }],
-        generationConfig: { responseMimeType: 'application/json' },
-      }),
-    })
+    // chat 模型路由：google/* → vertex generateContent；其他（qwen/…）→ OpenAI 兼容 /chat/completions
+    const res = CHAT_MODEL.startsWith('google/')
+      ? await fetch(`${VERTEX_BASE}/v1/publishers/google/models/${CHAT_MODEL.split('/').pop()}:generateContent`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${KEY}` },
+          body: JSON.stringify({
+            contents: [{ role: 'user', parts: [
+              { text: JUDGE },
+              { text: 'PROMPT:\n' + PROMPT },
+              { inlineData: { mimeType: mime, data: b } },
+            ] }],
+            generationConfig: { responseMimeType: 'application/json' },
+          }),
+        })
+      : await fetch(`${BASE_URL}/chat/completions`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${KEY}` },
+          body: JSON.stringify({
+            model: CHAT_MODEL,
+            max_tokens: 2000,
+            messages: [{ role: 'user', content: [
+              { type: 'text', text: JUDGE },
+              { type: 'text', text: 'PROMPT:\n' + PROMPT },
+              { type: 'image_url', image_url: { url: `data:${mime};base64,${b}` } },
+            ] }],
+          }),
+        })
     const data = await res.json()
     const txt = data?.choices?.[0]?.message?.content || data?.candidates?.[0]?.content?.parts?.[0]?.text || ''
     const m = txt.match(/\{[\s\S]*\}/)

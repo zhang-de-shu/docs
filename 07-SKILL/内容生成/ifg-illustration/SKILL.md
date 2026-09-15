@@ -152,7 +152,9 @@ setsid nohup python3 /tmp/preview_server.py >/tmp/preview_server.log 2>&1 < /dev
 - 环境备注：本机走 7890 代理时，`gen_batch.mjs` 需 `NODE_OPTIONS="--require scripts/proxy-preload.cjs"`（见脚本与参考）。
 
 ## 脚本与参考
-- `scripts/gen_batch.mjs`：**唯一图片生成脚本（单图 + 批量一体，现成完整，禁止现场另写生成代码）**。单图模式 `--prompt/--ref/--out`（手动重绘/补拍）；批量 `--manifest` 模式跑场景底图+节点图（自动记账/跳过已生成/402 即停/断点续跑）；批量 `--tasks` 模式跑临时清单（角色卡/封面），槽位仅 prompt/refs/out。配置读 `ZENMUX_API_KEY`、`ZENMUX_IMAGE_MODEL`（默认 google/gemini-2.5-flash-image），或 `--base-url/--model/--key` 传参；`--qc` 开四轴自检。退出码 5 = HTTP 402（余额/配额耗尽，整批停止）。
+- `scripts/gen_batch.mjs`：**唯一图片生成脚本（单图 + 批量一体，现成完整，禁止现场另写生成代码）**。单图模式 `--prompt/--ref/--out`（手动重绘/补拍）；批量 `--manifest` 模式跑场景底图+节点图（自动记账/跳过已生成/402 即停/断点续跑）；批量 `--tasks` 模式跑临时清单（角色卡/封面），槽位仅 prompt/refs/out。配置**自动加载脚本同目录 `.env`**（或上溯 4 层；已存在的环境变量优先），读 `ZENMUX_API_KEY`、`ZENMUX_IMAGE_MODEL`（默认 meta/muse-image-1.0）、`ZENMUX_CHAT_MODEL`（默认 **qwen/qwen3.7-flash**，仅 `--qc` 用），或 `--base-url/--model/--key/--protocol/--chat-model` 传参；`--qc` 开四轴自检。
+  - **默认模型 `meta/muse-image-1.0`**：协议走 OpenAI 兼容 `/images/generations|edits`（脚本已自动路由 `meta/*`），输出**竖版 9:16**、强制 `output_format=jpeg`；**支持多张参考图**（`image[]` 重复传，顺序=提示词里的 reference image 1/2/3，实操 ≤4 张：场景 1 + 角色 ≤3）；对人物一致性遵循好、对场景底图遵循偏弱（场景描写要写硬一点）。价格 $0.01/张，支持把上一张输出回传做迭代编辑。
+  - `google/*` 走 vertex `generateContent`（注意：gemini-2.5-flash-image 会无视 9:16 输出 1024×1024 方图，不要用它做竖版帧）。退出码 5 = HTTP 402（余额/配额耗尽，整批停止）。
 - `scripts/proxy-preload.cjs`：Node fetch 默认不走 HTTP(S)_PROXY；本机代理环境下调用时需 `NODE_OPTIONS="--require <skill>/scripts/proxy-preload.cjs"`（脚本目录已含 undici 依赖）。
 - `references/consistency.md`：三类镜头的锚点策略与提示词模板、角色 profile 模板、风格前缀示例、负面词表、manifest 结构、互动影游适配要点（UI 安全区/抉择构图/重玩不变性）。
 - 上游数据格式：`/root/zds/docs/07-SKILL/内容生成/ifg-story/references/data-model.md`。
