@@ -50,7 +50,7 @@
 CHARACTER DESIGN SHEET for "{剧名}" character {角色名}: full-body front view standing pose,
 plus 3 small head close-ups showing expressions (neutral, {情绪A}, {情绪B}).
 Character profile: {profile 逐字}.
-Plain background, simple model-sheet layout, no text.
+Plain background, simple model-sheet layout, no text, no watermark, no logo, no signature.
 {负面词}
 ```
 
@@ -59,7 +59,7 @@ Plain background, simple model-sheet layout, no text.
 {风格前缀}
 ESTABLISHING SHOT of {location}: {场景内容至少 3 句——空间布局 + 光源/时段 + 标志性陈设与氛围，禁止只写地名}.
 {time_weather: 时间点+天气/光源+流逝感}.
-No recognizable characters, or distant anonymous silhouettes only. Vertical 9:16 composition. No text.
+No recognizable characters, or distant anonymous silhouettes only. Vertical 9:16 composition. No text, no watermark, no logo, no signature.
 {负面词}
 ```
 
@@ -99,19 +99,23 @@ Reference image shows this prop earlier — it is a PROP DESIGN reference: keep 
 写入 manifest.style 后全剧锁定；给用户 2-3 个提案选一。
 
 - **写实影视向（默认，谍战/悬疑/都市）**：
-  `Cinematic photorealistic illustration, vertical 9:16 film still, muted color grading, natural lighting, shallow depth of field, 35mm film grain, full-bleed composition, artwork extends to all four edges, no borders or blank margins, no text.`
+  `Cinematic photorealistic illustration, vertical 9:16 film still, muted color grading, natural lighting, shallow depth of field, 35mm film grain, full-bleed composition, artwork extends to all four edges, no borders or blank margins, no text, no watermark, no logo, no signature.`
   负面词追加：`Avoid: cartoon, anime, oversaturated colors.`
 - **国风水墨（古风/武侠）**：
-  `Chinese ink-wash style illustration with restrained color accents, vertical composition, rice paper texture, atmospheric mist, full-bleed composition, artwork extends to all four edges, no borders or blank margins, no text.`
+  `Chinese ink-wash style illustration with restrained color accents, vertical composition, rice paper texture, atmospheric mist, full-bleed composition, artwork extends to all four edges, no borders or blank margins, no text, no watermark, no logo, no signature.`
 - **风格化插画（轻喜剧/青春）**：
-  `Stylized digital illustration, bold shapes, warm palette, soft grain, character-driven composition, full-bleed composition, artwork extends to all four edges, no borders or blank margins, no text.`
+  `Stylized digital illustration, bold shapes, warm palette, soft grain, character-driven composition, full-bleed composition, artwork extends to all four edges, no borders or blank margins, no text, no watermark, no logo, no signature.`
 
 ## 5. 负面词（固定，每条提示词末尾追加）
 
+**水印/文字为必含项（硬约束）**：每条提示词（角色设定卡 / 场景底图 / 节点图 / 封面，含单图重绘）都必须在**两处**同时覆盖水印 —— ① 风格前缀里的 `no watermark`（连同 `no text, no logo, no signature`）② 负面词里的 `watermark, text, logo, signature`。只写一处时模型可能忽略，两处都写才稳。
+
 ```
-Avoid: realistic rendering, gradients, airbrush, thick painterly shading, polished lighting, 3D render, photographic detail, white borders, letterboxing, empty margins, blank bottom third, text, watermark.
+Avoid: realistic rendering, gradients, airbrush, thick painterly shading, polished lighting, 3D render, photographic detail, watermark, text, logo, signature, white borders, letterboxing, empty margins, blank bottom third.
 ```
-依风格可增不可减核心项；写实风格整体替换为 `Avoid: cartoon, anime, oversaturated colors, flat vector art, white borders, letterboxing, empty margins, text, watermark.`
+依风格可增不可减核心项；写实风格整体替换为 `Avoid: cartoon, anime, oversaturated colors, flat vector art, watermark, text, logo, signature, white borders, letterboxing, empty margins.`
+
+水印排查提示：muse/gpt-image 系会在 JPEG 里写 XMP/EXIF 元数据（含生成器署名），这只是文件头信息、**不是画面水印**；验收看画面四周与角落有没有可见 logo/签名/文字条。若个别帧仍带水印，用同一提示词追加强化指令 `remove any watermark, logo, signature or text from the image, keep everything else identical` 走单图重绘（refs 锚点不变）。
 
 ## 6. 结局节点氛围指令
 

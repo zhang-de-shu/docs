@@ -28,6 +28,10 @@ description: 互动影游配图生成
    - **生成后**：一次性展示该批全部图片路径，可选用 `--qc` 让视觉模型按四轴（identity 角色一致 / wardrobe 服装 / set match 场景匹配 / manifest 命题符合）自检打分作为参考；用户整批确认后登记 manifest 为 done，个别不满意的按意见改提示词**单图重绘**（锚点 refs 不变，其余帧不受影响，重绘规则仿 ftl-studio：删掉对应文件重 roll 该帧）——**用户确认仍是唯一标准**。
    - **402 即停（硬约束）**：任何一次调用返回 HTTP 402（`gen_batch.mjs` 退出码 5，余额/配额耗尽），**立即停止整批任务**——不重试、不跳过该张继续、不擅自换模型或换 key；向用户报告 402 详情 + 已生成/未生成清单，等用户充值或明确指示后断点续跑（续跑同样先按 manifest+文件过滤，见执行步骤 §4）。
 5. **剧情符合性**：提示词必须从 project.json 真实数据组装——Scene 的 `art_prompt`/`environment`/`key_props`/`characters_present` 是主体，StoryNode 的 `sceneDesc`/`narrative` 提供本拍动作。禁止凭空发明场景。
+6. **无水印/无文字（硬约束）**：每条提示词（角色卡 / 场景底图 / 节点图 / 封面，含单图重绘）都必须在**两处**同时写清水印约束，只写一处模型可能忽略：
+   - 风格前缀里写 `no text, no watermark, no logo, no signature`；
+   - 负面词里写 `watermark, text, logo, signature`（见 `references/consistency.md` §5）。
+   验收看图时确认画面四周与角落**无可见 logo / 签名 / 文字条**（JPEG 里 XMP/EXIF 的生成器署名不算画面水印）；个别帧仍带水印时按同一提示词追加强化指令 `remove any watermark, logo, signature or text from the image, keep everything else identical` 单图重绘（refs 锚点不变，其余帧不受影响）。
 6. **产物直接可接入 ifg-runtime**：图片按节点 id 命名、按章分目录（`nodes/c1/c1n3.jpg`），产出 `images/manifest.json`，`assetsBase` 指向 images 目录即可被运行时加载。
 
 # 执行步骤

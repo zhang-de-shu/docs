@@ -64,7 +64,7 @@ const MODEL = arg('model') || process.env.ZENMUX_IMAGE_MODEL || 'meta/muse-image
 const BASE_URL = (arg('base-url') || process.env.ZENMUX_BASE_URL || 'https://zenmux.ai/api/v1').replace(/\/$/, '')
 const VERTEX_BASE = 'https://zenmux.ai/api/vertex-ai'
 const OUT = arg('out')
-const QC = !!arg('qc')
+const QC = process.argv.includes('--qc') || !!arg('qc') // 修：--qc 作为最后一个参数时 arg() 取不到值
 const CHAT_MODEL = arg('chat-model') || process.env.ZENMUX_CHAT_MODEL || 'qwen/qwen3.7-flash'
 const TIMEOUT_MS = 180_000
 
@@ -93,6 +93,7 @@ const timer = setTimeout(() => controller.abort(), TIMEOUT_MS)
 const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${KEY}` }
 
 async function main() {
+  if (!/watermark/i.test(PROMPT)) console.warn('[gen_image] ⚠ 提示词未含 watermark 约束（应同时含 "no watermark" 与负面词 "watermark"，见 SKILL.md 核心理念 6）')
   let res
   if (MODEL.startsWith('google/')) {
     res = await fetch(`${VERTEX_BASE}/v1/publishers/google/models/${MODEL.split('/')[1]}:generateContent`, {
@@ -187,6 +188,7 @@ async function qcCheck(imagePath) {
           body: JSON.stringify({
             model: CHAT_MODEL,
             max_tokens: 2000,
+            enable_thinking: false, // Qwen 等推理模型：关掉思考，否则 reasoning 吃光 token 使 content 为空
             messages: [{ role: 'user', content: [
               { type: 'text', text: JUDGE },
               { type: 'text', text: 'PROMPT:\n' + PROMPT },
@@ -195,7 +197,11 @@ async function qcCheck(imagePath) {
           }),
         })
     const data = await res.json()
-    const txt = data?.choices?.[0]?.message?.content || data?.candidates?.[0]?.content?.parts?.[0]?.text || ''
+    if (!res.ok) {
+      console.log(`[gen_image] QC HTTP ${res.status}（忽略）：${JSON.stringify(data).slice(0, 200)}`)
+      return
+    }
+    const txt = data?.choices?.[0]?.message?.content || data?.choices?.[0]?.message?.reasoning || data?.candidates?.[0]?.content?.parts?.[0]?.text || ''
     const m = txt.match(/\{[\s\S]*\}/)
     if (m) {
       const qc = JSON.parse(m[0])

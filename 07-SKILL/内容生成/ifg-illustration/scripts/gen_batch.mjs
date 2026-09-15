@@ -201,6 +201,7 @@ async function qcCheck(imagePath, PROMPT) {
           body: JSON.stringify({
             model: CHAT_MODEL,
             max_tokens: 2000,
+            enable_thinking: false, // Qwen 等推理模型：关掉思考，否则 reasoning 吃光 token 使 content 为空
             messages: [{ role: 'user', content: [
               { type: 'text', text: JUDGE },
               { type: 'text', text: 'PROMPT:\n' + PROMPT },
@@ -209,7 +210,11 @@ async function qcCheck(imagePath, PROMPT) {
           }),
         })
     const data = await res.json()
-    const txt = data?.choices?.[0]?.message?.content || data?.candidates?.[0]?.content?.parts?.[0]?.text || ''
+    if (!res.ok) {
+      console.log(`[gen] QC HTTP ${res.status}（忽略）：${JSON.stringify(data).slice(0, 200)}`)
+      return
+    }
+    const txt = data?.choices?.[0]?.message?.content || data?.choices?.[0]?.message?.reasoning || data?.candidates?.[0]?.content?.parts?.[0]?.text || ''
     const m = txt.match(/\{[\s\S]*\}/)
     if (m) {
       const qc = JSON.parse(m[0])
@@ -236,6 +241,7 @@ async function singleMode() {
     process.exit(1)
   }
   const refs = (arg('ref') || '').split(',').map((s) => s.trim()).filter(Boolean)
+  if (!/watermark/i.test(PROMPT)) console.warn('[gen] ⚠ 提示词未含 watermark 约束（应同时含 "no watermark" 与负面词 "watermark"，见 SKILL.md 核心理念 6）')
   process.exit(await generateOnce(PROMPT, refs, path.resolve(OUT)))
 }
 
@@ -309,6 +315,12 @@ async function batchMode() {
   }
 
   console.log(`[batch] 待生成 ${queue.length} 张，跳过 ${skipped.length} 张（已生成/状态不符/过滤/limit），间隔 ${INTERVAL}ms，QC=${QC ? 'on' : 'off'}`)
+
+  // 水印硬约束自检（只告警不改提示词）：见 SKILL.md 核心理念 6 / references/consistency.md §5
+  const noWm = queue.filter((t) => !/watermark/i.test(t.prompt))
+  if (noWm.length) {
+    console.warn(`[batch] ⚠ 以下 ${noWm.length} 条提示词未含 watermark 约束（应同时含 "no watermark" 与负面词 "watermark"）：${noWm.map((t) => t.id).join(', ')}`)
+  }
 
   let ok = 0, fail = 0, consecutiveFails = 0
   for (let i = 0; i < queue.length; i++) {
