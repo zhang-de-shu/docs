@@ -58,7 +58,7 @@
 
       // —— relationship 专属扩展字段 ——
       "target": "",                        // 好感对象角色名（须在 characters 中已定义）
-      "tiers": [                           // 好感分级区间；每级须有差异化表现（对白变体/专属选项），写在 label 对应的 monologue.variant 或 echoPlan 中
+      "tiers": [                           // 好感分级区间；每级须有差异化表现（对白变体/专属选项），写在 label 对应的 script 中 monologue 节拍 variant 或 echoPlan 中
         { "min": -5, "max": -2, "label": "冷陌" }
       ],
       "exclusiveGroup": ""                 // 可选，互斥组名——同组角色好感此消彼长，同一 choice 的 variableEffects 应体现对冲（+A/-B）
@@ -92,7 +92,7 @@
   "echoPlan": [
     {
       "variable": "",                      // 变量名（须在 variables 中已定义）；凭证类回响填 item id，前缀 "has:" 如 "has:secret_letter"
-      "readMode": [],                      // 'dialogue_variant'（对白/独白变体替换）| 'choice_gated'（选项门控显隐）| 'branch'（分支走向改变）| 'ending'（结局判定）——同一回响可多选
+      "readMode": [],                      // 'dialogue_variant'（对白/独白变体替换，即 script 中带 variant 的节拍）| 'choice_gated'（选项门控显隐）| 'branch'（分支走向改变）| 'ending'（结局判定）——同一回响可多选
       "writeChapter": 0,                   // 写入章（哪个选择写入）
       "readChapter": 0,                    // 读取章（哪段对白/选项/门控兑现）
       "echoDesc": ""                       // 回响方式描述（如"角色引用密信内容，未看过则该段对白替换"）；蝴蝶效应项注明
@@ -170,7 +170,7 @@
 
   // ═══════════════ 节点清单 ═══════════════
   // 阶段二产出结构与交互：id / title / order / notes / type / sceneId / sceneHeader / sceneDesc / choices / durationSeconds / exploreReturnNodeId
-  // 阶段三产出叙事与美术：narrative / dialogue / monologue / emotionFunction / entryState / exitState
+  // 阶段三产出叙事与美术：script / emotionFunction / entryState / exitState
   // 阶段四产出绘图提示词：imagePrompt
   "nodes": [
     {
@@ -193,20 +193,20 @@
       "sceneDesc": "",                     // 场景描述（摄影机语言：只写可见的动作与空间细节）
 
       // —— 叙事文本 ——
-      "narrative": "",                     // 主角视角的叙事文本（150-400 字散文体）：环境感官 + 人物举止表情 + 情节推进织进叙述流，对白嵌在叙事中；节点连读应为连续故事
-      "dialogue": [                        // 对白
+      "script": [                          // 演出节拍序列（按演出顺序排列，旁白/对白/独白可任意穿插）；
+                                           // 每个节拍一行；节点连读应为连续故事
         {
-          "speaker": "",                   // 说话人（主角自己的台词写角色名；对话不改人称）
-          "text": "",                      // 台词
-          "emotion": "",                   // 情绪
-          "action": ""                     // 可选，行为细节；若该行行为未在 narrative 中体现则必填
-        }
-      ],
-      "monologue": [                       // 内心独白（按需不设配额，全剧总量约为节点数 30-50%）
-        {
-          "place": "opening",              // 'opening'（信息差开场）| 'pre_choice'（选项前两难定格）| 'close'（BE/ending 收束）
-          "text": "",                      // ★第一人称现在时口语（「我」），单句 ≤30 字；不复述对白；「他/她」只能指别人
-          "variant": ""                    // 空 = 默认版；'stance-quick' / 'stance-proof' 等按立场类变量区分
+          "kind": "narration",             // 'narration' 旁白 | 'dialogue' 对白 | 'monologue' 内心独白
+          "text": "",                      // 该节拍文本：
+                                           //   narration：第二人称「你」写主角（150-400 字总量，散文体，可拆成多拍）：
+                                           //   环境感官 + 人物举止表情 + 情节推进织进叙述流
+                                           //   dialogue：说话人原话，不改人称，引号「…」保留
+                                           //   monologue：第一人称「我」现在时口语，单拍 ≤30 字，不复述对白
+          "speaker": "",                   // 仅 dialogue 必填：说话人（主角自己的台词写角色名；对话不改人称）
+          "emotion": "",                   // 仅 dialogue 可选：情绪
+          "action": "",                    // 可选，行为细节；若该拍动作未在其他旁白中体现则必填
+          "place": "",                     // 仅 monologue 可选：'opening'（信息差开场）| 'pre_choice'（选项前两难定格）| 'close'（BE/ending 收束）
+          "variant": ""                    // 仅 monologue 可选：空 = 默认版；'stance-quick' / 'stance-proof' 等按立场类变量区分
         }
       ],
 

@@ -47,7 +47,7 @@ characters.character_prompt、 items[].item_prompt、 scene[].art_prompt、 node
 - **场景提示词**：每场一条，写入 Scene 的 `art_prompt` -- 中文，风格前缀 + 通用前缀 + 依据location、environment、time_weather三字段形成完善具体的场景描述；refs 可带 item 参考图（场内关键道具，如 `[{"images/items/xx.jpg":"item"}]`）
 - **角色提示词**：每角色一条，写入 `characters[].character_prompt` -- 中文完整人物画像描述（稳定特征逐项展开，与 appearance 档案 face/head/body/palette 同源；表情/动作不入内），path = `images/characters/<角色名>.jpg`
 - **物品提示词**：每物品一条，写入 `items[].item_prompt` -- §规范 3 /材质/颜色/磨损等稳定特征），path = `images/items/<物品id>.jpg`；凭证/信物/道具必出，kind=item 的普通物品用于绘图形态一致性锚定
-- **节点提示词**：逐节点生成 `node.imagePrompt` -- 中文，风格前缀 + 通用前缀 + 基于`narrative`形成的场景描述 + 镜头类型（`shotType`） + 参考图描述（`sceneHeader`）+ refs（对象数组 `[{"<图片路径>":"<类型>"}]`，类型可选 character/scene/item/node，上传使用，而不是放在提示词里）；lean 档未出图节点改填 `imagePrompt.lean` = 复用节点的 id（此时其余字段留空）
+- **节点提示词**：逐节点生成 `node.imagePrompt` -- 中文，风格前缀 + 通用前缀 + 基于`script`旁白节拍形成的场景描述 + 镜头类型（`shotType`） + 参考图描述（`sceneHeader`）+ refs（对象数组 `[{"<图片路径>":"<类型>"}]`，类型可选 character/scene/item/node，上传使用，而不是放在提示词里）；lean 档未出图节点改填 `imagePrompt.lean` = 复用节点的 id（此时其余字段留空）
 
 ### 2.3 衍生档案
 - **道具档案**：需要细节镜头（shotType=prop）的道具一律登记为 `items` 条目并生成 `item_prompt`（中文稳定形态描述）+ 物品图；之后所有细节镜头逐字复用 item_prompt，refs 锚其物品图；状态变化只写在节点提示词 prompt 内，档案只锁形态。叙事性 key_props 的跨场流转仍记录在场 `key_props`。
@@ -184,7 +184,7 @@ STATE CHANGE: {本拍环境状态变化，如 "雨停了，地上有积水反光
 CHARACTER (must match character sheet exactly, verbatim): {出场角色 profile 逐字}
 SCENE: {场景描写（与底图同措辞）}
 KEY PROPS: {key_props 当前状态}
-ACTION: {本节点可见动作——从 sceneDesc/narrative 提取"摄影机能拍到"的内容；禁止内心活动入画}
+ACTION: {本节点可见动作——从 sceneDesc/script 旁白节拍提取"摄影机能拍到"的内容；禁止内心活动入画}
 CAMERA: {景别/机位：medium two-shot / over-the-shoulder / low angle ...}
 First reference image is the SCENE PLATE — it is a LOCATION/LIGHTING reference: keep the same location, spatial layout and light direction; do NOT copy any characters from it.
 Second and later reference images are CHARACTER SHEETS — they are CHARACTER DESIGN references: copy each character's face / hairstyle / outfit EXACTLY.
