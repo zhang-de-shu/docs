@@ -6,11 +6,14 @@
  *   node gen_batch.mjs --prompt "..." --ref a.png,b.jpg --out images/nodes/c1/c1n3.jpg [--qc]
  *   node gen_batch.mjs --prompt-file p.txt --out out.png
  *
- * 批量模式 A：manifest（场景底图 + 节点图，自动记账、断点续跑）：
- *   node gen_batch.mjs --manifest <项目目录>/images/manifest.json \
- *        [--group scenes|nodes] [--filter c1] [--status prompt_confirmed,failed] \
+ * 批量模式 A：project（直接读 project.json，自动记账、断点续跑）：
+ *   node gen_batch.mjs --project <项目目录>/project.json \
+ *        [--group scenes|nodes|sheets] [--filter c1] [--status prompt_confirmed,failed] \
  *        [--limit N] [--qc] [--interval-ms 2000] [--force]
- *   槽位 = manifest.scenes / manifest.nodes 条目的 { prompt, refs, path }（+ status）
+ *   槽位（全部存 project.json 内）：
+ *     sheets   = characters[] 条目的 { name, appearance, sheetPath, status }
+ *     scenes   = scene[] 条目的 { sceneId, art_prompt(prompt), imagePath(path), refs, status }
+ *     nodes    = nodes[] 条目的 { id, imagePrompt(prompt), imagePath(path), refs, status, reusedFrom }
  *
  * 批量模式 B：tasks（角色设定卡 / 封面等临时清单，不记账）：
  *   node gen_batch.mjs --tasks tasks.json [--base <项目目录>] [--qc] [--interval-ms 2000] [--force]
@@ -31,7 +34,7 @@
  *   - 跳过已生成：输出文件已存在（且非 rejected/--force）→ 不再调用图像模型；重复执行/中断续跑安全
  *   - HTTP 402（余额/配额耗尽）→ 立即停止整批，退出码 5；续跑重跑同一命令即可
  *   - 其他失败连续 3 次 → 停止，退出码 6
- *   - manifest 模式：先写图、后写 manifest（tmp+rename 原子落盘），每张实时置 done/failed
+ *   - project 模式：先写图、后写 project.json（tmp+rename 原子落盘），每张实时置 done/failed
  *
  * 退出码：0 成功（含跳过）| 1 用法错误 | 2 有失败项/HTTP 错误 | 3 响应无图 | 4 异常 | 5 = HTTP 402 整批停止 | 6 = 连续失败停止
  */
@@ -247,7 +250,7 @@ async function singleMode() {
 
 // ——— 批量模式 ———
 async function batchMode() {
-  const MANIFEST = arg('manifest')
+  const PROJECT = arg('project')
   const TASKS = arg('tasks')
   const FORCE = flag('force')
   const INTERVAL = Number(arg('interval-ms', '2000'))
@@ -258,22 +261,42 @@ async function batchMode() {
 
   let projectDir
   const tasks = []
-  let manifest = null
-  let manifestPath = null
+  let project = null
+  let projectPath = null
 
-  if (MANIFEST) {
-    manifestPath = path.resolve(MANIFEST)
-    projectDir = path.resolve(path.dirname(manifestPath), '..') // <项目目录>/images/manifest.json → <项目目录>
-    manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'))
-    for (const [group, dict] of [['scenes', manifest.scenes], ['nodes', manifest.nodes]]) {
-      for (const [id, e] of Object.entries(dict || {})) {
-        if (e.reusedFrom) continue // lean 档占位节点，不出图
-        if (!e.prompt || !e.path) {
-          if (STATUSES.includes(e.status)) console.warn(`[batch] ${group}.${id}: status=${e.status} 但缺 prompt/path 槽位，未入队`)
-          continue
-        }
-        tasks.push({ group, id, prompt: e.prompt, refs: e.refs || [], out: path.resolve(projectDir, e.path), entry: e })
-      }
+  if (PROJECT) {
+    projectPath = path.resolve(PROJECT)
+    projectDir = path.dirname(projectPath)
+    project = JSON.parse(fs.readFileSync(projectPath, 'utf8'))
+    if (!project.illustration) project.illustration = {} // 配图进度记账区
+    const ill = project.illustration
+    if (!ill.sheets) ill.sheets = {}
+    if (!ill.scenes) ill.scenes = {}
+    if (!ill.nodes) ill.nodes = {}
+    // sheets：来自 characters[].appearance / sheetPath
+    for (const c of project.characters || []) {
+      if (!c.appearance) continue
+      const e = ill.sheets[c.name] || (ill.sheets[c.name] = {})
+      e.prompt = e.prompt || buildSheetPrompt(project, c) // 缺失时按外貌卡兜底组装
+      e.path = e.path || c.sheetPath || `images/sheets/${c.name}.png`
+      c.sheetPath = e.path // 回写，保持 characters 与记账一致
+      tasks.push({ group: 'sheets', id: c.name, prompt: e.prompt, refs: e.refs || [], out: path.resolve(projectDir, e.path), entry: e })
+    }
+    // scenes：来自 scene[].art_prompt / imagePath
+    for (const s of project.scene || []) {
+      const e = ill.scenes[s.sceneId] || (ill.scenes[s.sceneId] = {})
+      e.prompt = e.prompt || s.art_prompt || ''
+      e.path = e.path || s.imagePath || `images/scenes/${s.sceneId}.jpg`
+      s.imagePath = e.path
+      tasks.push({ group: 'scenes', id: s.sceneId, prompt: e.prompt, refs: e.refs || [], out: path.resolve(projectDir, e.path), entry: e })
+    }
+    // nodes：来自 nodes[].imagePrompt / imagePath
+    for (const n of project.nodes || []) {
+      const e = ill.nodes[n.id] || (ill.nodes[n.id] = {})
+      e.prompt = e.prompt || n.imagePrompt || ''
+      e.path = e.path || n.imagePath || `images/nodes/${n.id.slice(0, n.id.indexOf('n'))}/${n.id}.jpg`
+      n.imagePath = e.path
+      tasks.push({ group: 'nodes', id: n.id, prompt: e.prompt, refs: e.refs || [], out: path.resolve(projectDir, e.path), entry: e, reusedFrom: e.reusedFrom })
     }
   } else {
     const tasksPath = path.resolve(TASKS)
@@ -284,11 +307,16 @@ async function batchMode() {
     }
   }
 
-  function saveManifest() {
-    if (!manifestPath) return
-    const tmp = manifestPath + '.tmp'
-    fs.writeFileSync(tmp, JSON.stringify(manifest, null, 2))
-    fs.renameSync(tmp, manifestPath)
+  function buildSheetPrompt(p, c) {
+    const a = c.appearance
+    return `CHARACTER DESIGN SHEET for "${p.title}" character ${c.name}: full-body front view standing pose, plus 3 small head close-ups. Character profile: ${a.face}; ${a.head}; ${a.body}. Palette: ${a.palette}. Plain background, simple model-sheet layout, no text, no watermark, no logo, no signature.`
+  }
+
+  function saveProject() {
+    if (!projectPath) return
+    const tmp = projectPath + '.tmp'
+    fs.writeFileSync(tmp, JSON.stringify(project, null, 2))
+    fs.renameSync(tmp, projectPath)
   }
 
   // 过滤：状态 / 分组 / 关键字 / 已生成跳过 / limit
@@ -296,15 +324,20 @@ async function batchMode() {
   let queue = []
   for (const t of tasks) {
     const st = t.entry.status
-    if (MANIFEST && st && !STATUSES.includes(st)) { skipped.push(`${t.id}(status=${st})`); continue }
+    if (t.reusedFrom) { skipped.push(`${t.id}(reusedFrom=${t.reusedFrom})`); continue } // lean 档占位节点，不出图
+    if (PROJECT && st && !STATUSES.includes(st)) { skipped.push(`${t.id}(status=${st})`); continue }
     if (GROUP && t.group !== GROUP) { skipped.push(`${t.id}(group)`); continue }
     if (FILTER && !t.id.includes(FILTER)) { skipped.push(`${t.id}(filter)`); continue }
+    if (PROJECT && !t.prompt) {
+      if (STATUSES.includes(st)) console.warn(`[batch] ${t.group}.${t.id}: status=${st} 但缺提示词槽位，未入队`)
+      skipped.push(`${t.id}(缺prompt)`); continue
+    }
     const exists = fs.existsSync(t.out) && fs.statSync(t.out).size > 0
     if (st === 'rejected') {
       if (exists) { fs.rmSync(t.out); console.log(`[batch] ${t.id}: rejected，已删旧图待重绘`) }
     } else if (exists && !FORCE) {
       skipped.push(`${t.id}(已生成)`)
-      if (MANIFEST && st !== 'done') { t.entry.status = 'done'; saveManifest() } // 文件在但账没记 → 补记
+      if (PROJECT && st !== 'done') { t.entry.status = 'done'; saveProject() } // 文件在但账没记 → 补记
       continue
     }
     queue.push(t)
@@ -329,20 +362,20 @@ async function batchMode() {
     const code = await generateOnce(t.prompt, t.refs.map((r) => path.resolve(projectDir, r)), t.out)
     if (code === 0) {
       ok++; consecutiveFails = 0
-      if (MANIFEST) { t.entry.status = 'done'; delete t.entry.error }
-      saveManifest()
+      if (PROJECT) { t.entry.status = 'done'; delete t.entry.error }
+      saveProject()
     } else if (code === 5) {
       // HTTP 402：余额/配额耗尽 —— 整批硬停，不重试不跳过
       fail++
-      if (MANIFEST) { t.entry.status = 'failed'; t.entry.error = 'HTTP 402（配额/余额耗尽）' }
-      saveManifest()
+      if (PROJECT) { t.entry.status = 'failed'; t.entry.error = 'HTTP 402（配额/余额耗尽）' }
+      saveProject()
       console.error(`\n[batch] ⛔ HTTP 402：余额/配额耗尽，整批任务已停止。本轮成功 ${ok} 张，剩余未生成 ${queue.length - i - 1} 张。`)
       console.error('[batch] 请充值或明确指示后重跑同一命令——已生成图片会自动跳过，不会重复消耗配额。')
       process.exit(5)
     } else {
       fail++; consecutiveFails++
-      if (MANIFEST) { t.entry.status = 'failed'; t.entry.error = `退出码 ${code}`; t.entry.retries = (t.entry.retries || 0) + 1 }
-      saveManifest()
+      if (PROJECT) { t.entry.status = 'failed'; t.entry.error = `退出码 ${code}`; t.entry.retries = (t.entry.retries || 0) + 1 }
+      saveProject()
       if (consecutiveFails >= 3) {
         console.error(`[batch] ⛔ 连续 3 次失败（最近退出码 ${code}），停止以免无效消耗。排查后重跑同一命令即可续跑。`)
         process.exit(6)
@@ -357,8 +390,8 @@ async function batchMode() {
 }
 
 if (arg('prompt') || arg('prompt-file')) await singleMode()
-else if (arg('manifest') || arg('tasks')) await batchMode()
+else if (arg('project') || arg('tasks')) await batchMode()
 else {
-  console.error('用法: node gen_batch.mjs --prompt "..." --out x.jpg（单图） | --manifest <项目目录>/images/manifest.json（批量） | --tasks tasks.json（临时清单）')
+  console.error('用法: node gen_batch.mjs --prompt "..." --out x.jpg（单图） | --project <项目目录>/project.json（批量） | --tasks tasks.json（临时清单）')
   process.exit(1)
 }

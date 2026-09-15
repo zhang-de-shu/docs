@@ -4,12 +4,12 @@
 ## 目标
 - 字段说明见：data-model.md
 - 前几个阶段的产出在 project.json。本阶段的字段范围如下：
-    - **节点新写/补齐**：`narrative`、`dialogue`、`monologue`（按需）、`emotionFunction`、`entryState`/`exitState`、`imagePrompt`、`shotType`
-    - **场补齐**：`environment`、`time_weather`、`key_props`、`art_prompt`（场骨架 sceneId/nodeIds/location/characters_present 为阶段二产出，本阶段不改；回响节点的道具状态流转同步更新到 key_props）
-    - **角色补齐**：`characters[].appearance`（外貌卡 face/head/body/palette，英文；供 ifg-illustration 角色设定卡逐字采纳）
+    - **节点新写/补齐**：`narrative`、`dialogue`、`monologue`（按需）、`emotionFunction`、`entryState`/`exitState`
+    - **场补齐**：`environment`、`time_weather`、`key_props`（场骨架 sceneId/nodeIds/location/characters_present 为阶段二产出，本阶段不改；回响节点的道具状态流转同步更新到 key_props）
     - **允许微调**：`chapter.title`（章名随状态变化手法）
     - **禁止改动**：choices、conditions、variableEffects、targetNodeId、type、nodeIds、endings 等一切结构与选项字段——发现结构问题不在本阶段修，报告用户后回阶段三流程
-- 当前任务：对每个节点做叙事化润色和丰富、生成每个节点的场景绘图提示词
+    - **配图字段不属于本阶段**：`imagePrompt`、`shotType`、`art_prompt`、`characters[].appearance` 由**阶段五**生成并写入 project.json，本阶段禁止预写
+- 当前任务：对每个节点做叙事化润色和丰富（纯文本，不含配图提示词）
 
 
 ## 分层模型
@@ -31,14 +31,6 @@
 - **延迟回响的文本兑现**：回响读取节点的对白/叙述必须让玩家"认出"早前的选择（角色提起上一章的事、道具因早前选择而出现/缺席）；全剧 1-2 处蝴蝶效应式远期回响在终章落笔时须把早期的小选择重构为影响终局的陷阱/凭证。
 - **章名可随状态变化**（直到黎明手法）：润色阶段可按该章实际世界状态微调章名，作为低成本高感知的"世界记得你的选择"信号。
 
-## 配图提示词三件套（硬约束）
-
-写 narrative 的同一批内，为每个节点生成配图提示词并写入 project.json（供下游 ifg-illustration 直接使用，避免二次创作丢失语境）——
-
-- **三件套**：① 场景提示词（每场一条：location + environment + time_weather + art_prompt，英文）② 角色提示词（每角色一条：外貌卡 face/head/body/palette，英文，**写入 `characters[].appearance`**——只写稳定特征，表情/动作永不入档案；ifg-illustration 的角色设定卡逐字采纳此字段）③ 节点提示词 `node.imagePrompt`（英文，结构：style + shotType + Scene(取本场场景描述) + Story moment(节点标题+notes/narrative 摘要≤400字符) + mood(结局按类型着色) + ref 方向标注 + 满幅构图约束 + negative）。
-- **shotType 判定**：在场角色含设定卡角色 → `character`（refs=[本场场景底图, 各角色 sheetPath]，ref 标注必须写明"参考图1仅作背景构图、参考图2+仅作人物外貌"）；无角色 → `scene`；特写道具时刻 → `prop`。
-- **imageTier 配置**：project.json 顶层 `imageTier`：`"lean"`（默认）或 `"full"`。lean 档：start/branch/ending 节点 + 关键 normal 节点生成节点图，其余节点在 manifest 记 `reusedFrom: "<sceneId>"` 直接复用场景底图占位（运行时要求每节点有配图记录）；full 档：全部节点生成。生成哪些节点须在交付说明里列出清单供用户确认。
-
 - **人物出场必须有引介**：玩家是从零开始认识这个世界的，每个角色**第一次出场**时，narrative 必须用旁白/叙述/他人对话自然带出他的身份与来头（姓名、身份、与主角的关系或利害）——让一个从没玩过游戏的玩家也能立刻明白"这是谁、为什么重要"。两种处理：
     - **明角色**：出场即由叙述交代身份（"谢无衣，副盟主，摄政二十年——灵堂里没人比他更早到"）。
     - **隐藏身份角色**：可以刻意藏，但必须给出**神秘感引介**——不明说身份，却要让玩家意识到"此人来路不明、值得警惕"（"没人知道这人从哪来，只知道他总在错的时间出现在错的地方"）；真身揭晓的那一刻回扣此前的伏笔。
@@ -46,15 +38,8 @@
 
 ## 工作步骤
 
-1. **场背景充实**：为每场补齐 environment（真实感）/ time_weather / key_props（含跨场流转）/ art_prompt（同章风格前缀一致）。
-2. **逐节点润色**：每节点产出 narrative（嵌入对白 6-10 行）+ 按需 monologue + emotionFunction（emotionIn/out、playerEmotion、tension、internal_lie、fear）+ entryState/exitState；回响读取节点的对白/叙述必须兑现早前 Flag（道具状态同步更新到场 key_props）。
-3. **内容落盘**：按 SKILL.md「写入口规则」以精确 patch 方式分批写入 project.json（每批只改本批节点的 narrative/dialogue/emotionFunction 等字段，不触碰结构与选项），防止丢失。
-4. **导出交付**（两件缺一不可）：
-   ```bash
-   node scripts/export.js <项目JSON路径> <输出目录>
-   ```
-   - `剧本.md`：按 章→场→节点 组织，节点含叙事文本、对白（说话人：台词）、玩家选项（含条件与变量标注）；BE 节点单独标注。
-   - `project.json`：完整数据。
-   - 核对两个文件存在且非空。
-5. **收尾复验**：内容润色不应动结构，但仍复跑一次 validate.js 确认 error 仍为 0（防止误改 targetNodeId/conditions），然后交付。
+1. **场背景充实**：为每场补齐 environment（真实感）/ time_weather / key_props（含跨场流转）。
+2. **逐节点润色**：每节点产出 narrative（对白、独白、旁白，必须将该节点故事讲述清楚）+ 按需 monologue + emotionFunction（emotionIn/out、playerEmotion、tension、internal_lie、fear）+ entryState/exitState；回响读取节点的对白/叙述必须兑现早前 Flag（道具状态同步更新到场 key_props）。
+3. **内容落盘**：按 SKILL.md「写入口规则」以精确 patch 方式分批写入 project.json（每批只改本批节点的 narrative/dialogue/emotionFunction 等文本字段，不触碰结构与选项），防止丢失。
+4. **收尾复验**：内容润色不应动结构，但仍复跑一次 validate.js 确认 error 仍为 0（防止误改 targetNodeId/conditions），然后交付。
 

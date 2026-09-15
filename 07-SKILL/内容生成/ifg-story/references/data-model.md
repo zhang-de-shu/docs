@@ -11,8 +11,8 @@
   // ═══════════════ 顶层元信息 ═══════════════
   "title": "string",                       // 作品名
   "imageTier": "lean",                     // 'lean' | 'full' 配图档位；lean=仅关键节点出图、其余复用场景底图占位，默认 lean
-  "cover": "",                             // 菜单封面文件名（如 "cover.jpg"）；由 ifg-illustration 生成封面后填写
-  "assetsBase": "",                        // images 目录的站点绝对路径或 CDN 前缀（中文需 URL 编码）；由 ifg-illustration 部署阶段填写
+  "cover": "",                             // 菜单封面文件名（如 "cover.jpg"）；由阶段五配图生成封面后填写
+  "assetsBase": "",                        // images 目录的站点绝对路径或 CDN 前缀（中文需 URL 编码）；由阶段五部署阶段填写
 
   // ═══════════════ 阶段一：故事蓝图 ═══════════════
 
@@ -56,7 +56,7 @@
       "need": "",                          // 内在需求（真正需要什么）
       "fatalFlaw": "",                     // 致命弱点，仅主角："性格缺陷 → 恶果形式"映射，即死 BE 岔口的恶果库——BE 的本质是这条路线的故事到此为止，真死只是形式之一，暴露/失败/崩塌/被逐同样成立；阶段二 BE 恶果必须引用或呼应此项，不得随机编造；配角不填
       "isAffectionTarget": false,          // 是否好感对象（仅启用好感系统时标注，题材层选配）
-      "appearance": {                      // 外貌卡（美术档案，阶段四产出）；ifg-illustration 角色设定卡逐字采纳，禁止下游另行发明外貌
+      "appearance": {                      // 外貌卡（美术档案，阶段五产出）；角色设定卡逐字采纳，禁止下游另行发明外貌
         "face": "",                        // 面部稳定特征（英文 ≤25 词；表情/动作不入档案）
         "head": "",                        // 发型/头饰（英文 ≤25 词）
         "body": "",                        // 体型/服装（英文 ≤25 词）
@@ -131,7 +131,7 @@
 
   // ═══════════════ 阶段二：叙事内容 ═══════════════
 
-  "chapters": [                            // Chapter[]（阶段二产出；title 可在阶段四随状态变化微调）
+  "chapters": [                            // Chapter[]（阶段二产出；title 可在阶段三随状态变化微调）
     {
       "title": "",                         // 章标题
       "order": 1                           // 章序号
@@ -139,7 +139,7 @@
   ],
 
   // Scene[]，场层。阶段分工——阶段二产出骨架：sceneId / chapterOrder / nodeIds / location / characters_present（含首次出场登记）；
-  //   阶段四充实内容：time_weather / environment / key_props / art_prompt（key_props 随回响节点的道具状态流转在阶段四同步更新）
+  //   阶段三充实内容：time_weather / environment / key_props（key_props 随回响节点的道具状态流转在阶段三同步更新）；阶段五产出：art_prompt
   "scene":[
   {
     "sceneId": "c1s1",                   // c{章}s{序}
@@ -152,7 +152,7 @@
                                          // 五感至少跨三感、空间被功能塑形、允许损耗与不一致、细节可反推住民及处境
     "key_props": [],                     // 叙事性道具及状态（半盏冷茶、断刀出鞘）；跨场流转必须交代去向
     "characters_present": [],            // 在场人物及进场姿态；不在名单上的人物不得在本场开口。
-                                         // 角色的首次出场所在节点须登记（供阶段四的出场引介使用）
+                                         // 角色的首次出场所在节点须登记（供阶段三的出场引介使用）
     "art_prompt": ""                     // 可直接喂给 AI 画图/视频生成的提示词（写实向；同章风格前缀一致；
                                          // 同一空间复用时主体不变只变状态层）
   }
@@ -161,8 +161,8 @@
   "nodes": [                               // StoryNode[]，核心叙事单元 = 小节；数组顺序 = 叙事顺序
                                            // 阶段分工——阶段二产出结构与交互：id / title / order / notes / type / sceneId / sceneHeader /
                                            //   sceneDesc / choices / durationSeconds / exploreReturnNodeId；
-                                           //   阶段四产出叙事与美术：narrative / dialogue / monologue / emotionFunction / entryState /
-                                           //   exitState / imagePrompt / shotType。阶段四禁止改动结构与选项字段
+                                           //   阶段三产出叙事与美术：narrative / dialogue / monologue / emotionFunction / entryState /
+                                           //   exitState；阶段五产出美术：imagePrompt / shotType。阶段三禁止改动结构与选项字段
     {
       // —— 标识与类型 ——
       "id": "c1n1",                        // c{章}n{序}，如 c1n3（序章用 c0 前缀）
@@ -229,8 +229,8 @@
       "durationSeconds": 0,                // 预估时长（秒）
       "exploreReturnNodeId": "",           // explore 节点专用：返回主线目标节点 id
 
-      // —— 美术（阶段四随 narrative 同批产出）——
-      "imagePrompt": "",                   // 英文配图提示词，供 ifg-illustration 直接使用。结构：style + shotType
+      // —— 美术（阶段五产出）——
+      "imagePrompt": "",                   // 英文配图提示词，结构：style + shotType
                                            // + Scene(本场场景) + Story moment(标题+叙事摘要≤400字符) + mood
                                            // + ref 方向标注 + 满幅构图 + negative
       "shotType": "character"              // 'character'（在场角色含设定卡角色）| 'scene'（无角色）| 'prop'（特写道具时刻）
@@ -238,7 +238,27 @@
     }
   ],
 
-  "endings": [                             // Ending[]，结局绑定（阶段二产出；阶段四禁止改动）
+  "illustration": {                        // 配图进度记账区（阶段五产出与维护；脚本 gen_batch.mjs 直接读写）
+                                           // 提示词本体存于 art_prompt / appearance / imagePrompt，此处字段与之同源
+    "style": "",                           // 风格前缀（全剧锁定）
+    "negative": "",                        // 全局负面词
+    "props": {},                           // { 道具名: "≤25词英文形态描述" }，细节镜头逐字复用，档案只锁形态
+    "sheets": {                            // 角色设定卡记账：{ 角色名: {prompt, refs, path, status, retries?} }
+      "林秋": { "prompt": "", "refs": [], "path": "images/sheets/林秋.png", "status": "pending" }
+    },
+    "scenes": {                            // 场景底图记账：{ sceneId: {prompt, refs, path, status} }
+      "c1s1": { "prompt": "", "refs": [], "path": "images/scenes/c1s1.jpg", "status": "pending" }
+    },
+    "nodes": {                             // 节点图记账：{ 节点id: {prompt, refs, path, status, reusedFrom?, qc?, retries?} }
+      "c1n1": { "prompt": "", "refs": ["images/scenes/c1s1.jpg", "images/sheets/林秋.png"],
+                "path": "images/nodes/c1/c1n1.jpg", "status": "pending" }
+                                           // refs 顺序铁律：参考图1=场景底图（仅背景构图），参考图2+=角色卡（仅人物外貌）
+                                           // status: pending → prompt_confirmed（用户确认提示词）→ done（用户确认图片）/ rejected（意见记录后重绘）
+                                           // lean 档未出图节点不记 prompt，改记 "reusedFrom": "<sceneId>" 复用场景底图占位
+    }
+  },
+
+  "endings": [                             // Ending[]，结局绑定（阶段二产出；阶段三禁止改动）
     {
       "nodeId": "",                        // 结局节点 id
       "title": "",                         // 结局名
@@ -251,7 +271,7 @@
     }
   ],
 
-  // ═══════════════ 校验与评审 ═══════════════
+  // ═══════════════ 阶段二：校验与评审 ═══════════════
 
   "lastValidation": {                      // ValidationReport，由 scripts/validate.js 生成
     "generatedAt": "",                     // 生成时间
